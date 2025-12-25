@@ -16,5 +16,7 @@ HW/examples/GHRD/ztachip.hw
 HW/examples/GHRD/ztachip.runs
 HW/examples/GHRD/ztachip.srcs
 HW/examples/GHRD/ztachip.xpr
+HW/examples/GHRD/ztachip.sim
+HW/examples/GHRD/ztachip.ip_user_files
 tools/ghdl/build
 tools/ghdl/soc.v

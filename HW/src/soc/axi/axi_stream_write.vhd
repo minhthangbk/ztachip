@@ -121,6 +121,7 @@ signal s_write:std_logic;
 signal skip_r:unsigned(31 downto 0);
 signal data_avail:std_logic;
 constant stride_c:integer:=8;
+constant MAX_PENDING_REQ:integer:=4;
 begin
 
 s_wcurr_next <= s_wcurr_r+to_unsigned(1,s_wcurr_r'length);
@@ -194,7 +195,7 @@ s_write <= '1' when (skip_r=to_unsigned(0,skip_r'length)) and
                   (write_fifo_full='0') else '0';
 
 
-process(data_avail,s_write,skip_r)
+process(reset_in,data_avail,s_write,skip_r)
 begin
    if reset_in='0' then
       skip_r <= (others=>'0');
@@ -315,7 +316,7 @@ begin
                s_wcurr_r <= s_wnext; 
             end if;
          elsif(burst_remain_r=to_unsigned(0,burst_remain_r'length) and 
-               unsigned(write_req_r)=unsigned(write_rsp_r) and
+               ((signed(write_req_r)-signed(write_rsp_r)) < to_signed(MAX_PENDING_REQ,write_req_r'length)) and
                unsigned(ravail) > to_unsigned(WRITE_MAX_PENDING,ravail'length)) then
             -- Let start another burst if current burst is complete and acknowledge and
             -- there are enough data on FIFO for the next burst

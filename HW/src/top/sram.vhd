@@ -45,6 +45,7 @@ ENTITY sram IS
         SIGNAL dp_read_vector_in    : IN dp_vector_t;
         SIGNAL dp_read_gen_valid_in : IN STD_LOGIC;
         SIGNAL dp_writedata_in      : IN STD_LOGIC_VECTOR(ddr_data_width_c-1 DOWNTO 0);
+        SIGNAL dp_writebe_in        : IN STD_LOGIC_VECTOR(ddr_data_width_c/8-1 DOWNTO 0);
         SIGNAL dp_readdatavalid_out : OUT STD_LOGIC;
         SIGNAL dp_readdata_out      : OUT STD_LOGIC_VECTOR(ddr_data_width_c-1 DOWNTO 0)
     );
@@ -119,7 +120,7 @@ delay_i1: delay generic map(DEPTH => read_latency_sram_c-1)
 dp_wr_addr <= dp_wr_addr_in(DEPTH-1 downto ddr_vector_depth_c);
 dp_rd_addr <= dp_rd_addr_in(DEPTH-1 downto ddr_vector_depth_c);
 
-process(dp_wr_addr_in,dp_write_vector_in,dp_writedata_in)
+process(dp_wr_addr_in,dp_write_vector_in,dp_writedata_in,dp_writebe_in)
 begin
 if unsigned(dp_write_vector_in)=to_unsigned(ddr_vector_width_c/2-1,dp_write_vector_in'length) then
     case dp_wr_addr_in(ddr_vector_depth_c-1 downto ddr_vector_depth_c-1) is
@@ -243,7 +244,7 @@ elsif unsigned(dp_write_vector_in)=to_unsigned(ddr_vector_width_c/8-1,dp_write_v
                     dp_writedata_in(ddr_data_width_c/8-1 downto 0) &
                     dp_writedata_in(ddr_data_width_c/8-1 downto 0);
 else
-   byteena <= (others=>'1');
+   byteena <= dp_writebe_in;
    dp_writedata <= dp_writedata_in;
 end if;
 end process;

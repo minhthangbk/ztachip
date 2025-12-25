@@ -348,6 +348,59 @@ begin
    return short_v;
 end function int2short;
 
+---
+-- Convert from bfloat12 to bfloat16
+----
+--VUONG TODO
+subtype int2bfloat_retval_t is std_logic_vector(2*data_width_c-1 downto 0);
+function int2bfloat(
+        int_in:std_logic_vector(register_width_c-1 downto 0)) 
+        return int2bfloat_retval_t is
+variable bfloat_v:std_logic_vector(2*data_width_c-1 downto 0);
+variable exp_v:std_logic_vector(7 downto 0);
+variable mantissa_v:std_logic_vector(fp12_mantissa_width_c-1 downto 0);
+begin
+   exp_v(3 downto 0) := int_in(10 downto 7);
+   exp_v(7 downto 4) := (others=>'0');
+   mantissa_v := int_in(fp12_mantissa_width_c-1 downto 0);
+   if(exp_v=std_logic_vector(to_unsigned(0,exp_v'length))) then
+      if(mantissa_v=std_logic_vector(to_unsigned(0,fp12_mantissa_width_c))) then
+         bfloat_v := (others=>'0');
+      else
+         bfloat_v(15) := int_in(11);
+         bfloat_v(14 downto 0) := (others=>'0');
+         if mantissa_v(6) = '1' then
+            bfloat_v(6 downto 1) := mantissa_v(5 downto 0);
+            bfloat_v(14 downto 7) := std_logic_vector(to_unsigned(133,8));
+         elsif mantissa_v(5) = '1' then
+            bfloat_v(6 downto 2) := mantissa_v(4 downto 0);
+            bfloat_v(14 downto 7) := std_logic_vector(to_unsigned(132,8));
+         elsif mantissa_v(4) = '1' then
+            bfloat_v(6 downto 3) := mantissa_v(3 downto 0);
+            bfloat_v(14 downto 7) := std_logic_vector(to_unsigned(131,8));
+         elsif mantissa_v(3) = '1' then
+            bfloat_v(6 downto 4) := mantissa_v(2 downto 0);
+            bfloat_v(14 downto 7) := std_logic_vector(to_unsigned(130,8));
+         elsif mantissa_v(2) = '1' then
+            bfloat_v(6 downto 5) := mantissa_v(1 downto 0);
+            bfloat_v(14 downto 7) := std_logic_vector(to_unsigned(129,8));
+         elsif mantissa_v(1) = '1' then
+            bfloat_v(6 downto 6) := mantissa_v(0 downto 0);
+            bfloat_v(14 downto 7) := std_logic_vector(to_unsigned(128,8));
+         elsif mantissa_v(0) = '1' then
+            bfloat_v(14 downto 7) := std_logic_vector(to_unsigned(127,8));
+         else
+            bfloat_v := (others=>'0');
+         end if;
+      end if;
+   else
+      bfloat_v(15) := int_in(11); -- Sign bit
+      bfloat_v(14 downto 7) := std_logic_vector(unsigned(exp_v)+to_unsigned(126+fp12_mantissa_width_c,8));
+      bfloat_v(6 downto 0) := mantissa_v;
+   end if;
+   return bfloat_v;
+end function int2bfloat;
+
 begin
 
 spe_wr <= dp_write_in and dp_wr_spe;
@@ -451,9 +504,15 @@ begin
                   stream_output_r((I+1)*data_width_c-1 downto I*data_width_c) <= int2short(output((I+1)*register_width_c-1 downto I*register_width_c));
                end loop;
             else
-               for I in 0 to ddr_vector_width_c/2-1 loop
-                  stream_output_r((2*I+2)*data_width_c-1 downto (2*I+0)*data_width_c) <= std_logic_vector(resize(signed(output((I+1)*register_width_c-1 downto (I+0)*register_width_c)),data_width_c*2));
-               end loop;
+               if(dp_read_data_type2_rrrrr = dp_data_type_bfloat_c) then
+                  for I in 0 to ddr_vector_width_c/2-1 loop
+                     stream_output_r((2*I+2)*data_width_c-1 downto (2*I+0)*data_width_c) <= int2bfloat(output((I+1)*register_width_c-1 downto (I+0)*register_width_c));
+                  end loop;
+               else
+                  for I in 0 to ddr_vector_width_c/2-1 loop
+                     stream_output_r((2*I+2)*data_width_c-1 downto (2*I+0)*data_width_c) <= std_logic_vector(resize(signed(output((I+1)*register_width_c-1 downto (I+0)*register_width_c)),data_width_c*2));
+                  end loop;
+               end if;
             end if;
       end if;
    end if;

@@ -29,10 +29,17 @@ use IEEE.numeric_std.all;
 use work.ztachip_pkg.all;
 
 ENTITY ztachip IS
+   GENERIC (
+        FPU_ENABLED :boolean
+        );
     port(   
             clock_in                      : IN STD_LOGIC;
             clock_x2_in                   : IN STD_LOGIC;
             reset_in                      : IN STD_LOGIC;                      
+
+            debug_in                      : IN STD_LOGIC_VECTOR(3 downto 0);
+
+            -- AXI master interface to access DDR memory
 
             axi_araddr_out                : OUT std_logic_vector(ddr_bus_width_c-1 downto 0);
             axi_arlen_out                 : OUT unsigned(ddr_burstlen_width_c-1 downto 0);
@@ -89,7 +96,21 @@ ENTITY ztachip IS
             axilite_wready_out            : OUT std_logic;
             axilite_bvalid_out            : OUT std_logic;
             axilite_bready_in             : IN std_logic;
-            axilite_bresp_out             : OUT std_logic_vector(1 downto 0)
+            axilite_bresp_out             : OUT std_logic_vector(1 downto 0);
+
+            -- AXI slave interface to access SRAM
+
+            axislave_araddr_in            : IN STD_LOGIC_VECTOR(31 downto 0);
+            axislave_arburst_in           : IN STD_LOGIC_VECTOR(1 downto 0);
+            axislave_arlen_in             : IN STD_LOGIC_VECTOR(7 downto 0);
+            axislave_arready_out          : OUT STD_LOGIC;
+            axislave_arsize_in            : IN STD_LOGIC_VECTOR(2 downto 0);
+            axislave_arvalid_in           : IN STD_LOGIC;
+            axislave_rdata_out            : OUT STD_LOGIC_VECTOR(31 downto 0);
+            axislave_rlast_out            : OUT STD_LOGIC;
+            axislave_rready_in            : IN STD_LOGIC;
+            axislave_rresp_out            : OUT STD_LOGIC_VECTOR(1 downto 0);
+            axislave_rvalid_out           : OUT STD_LOGIC
             );
 END ztachip;
 
@@ -106,6 +127,12 @@ SIGNAL host_readdata:STD_LOGIC_VECTOR(host_width_c-1 downto 0);
 SIGNAL host_readdatavalid:STD_LOGIC;
 SIGNAL host_writewait:STD_LOGIC;
 SIGNAL host_readwait:STD_LOGIC;
+SIGNAL host_dp_readdatavalid:STD_LOGIC;
+SIGNAL host_dp_writewait:STD_LOGIC;
+SIGNAL host_dp_readwait:STD_LOGIC;
+SIGNAL host_fpu_readdatavalid:STD_LOGIC;
+SIGNAL host_fpu_writewait:STD_LOGIC;
+SIGNAL host_fpu_readwait:STD_LOGIC;
 
 -- Task completion signals
 
@@ -187,6 +214,19 @@ SIGNAL ddr_data_wait:STD_LOGIC_VECTOR(fork_max_c-1 downto 0);
 SIGNAL ddr_write_end:vectors_t(fork_ddr_c-1 downto 0);
 SIGNAL ddr_read_vm:STD_LOGIC;
 SIGNAL ddr_readdata_vm:STD_LOGIC;
+
+--- FPU bus 
+
+SIGNAL fpu_rd_addr:STD_LOGIC_VECTOR(sram_depth_c-1 DOWNTO 0);
+SIGNAL fpu_wr_addr:STD_LOGIC_VECTOR(sram_depth_c-1 DOWNTO 0);        
+SIGNAL fpu_write:STD_LOGIC;
+SIGNAL fpu_write_wait:STD_LOGIC;
+SIGNAL fpu_read:STD_LOGIC;
+SIGNAL fpu_read_wait:STD_LOGIC;
+SIGNAL fpu_writedata:STD_LOGIC_VECTOR(ddr_data_width_c-1 DOWNTO 0);
+SIGNAL fpu_writebe:STD_LOGIC_VECTOR(ddr_data_width_c/8-1 DOWNTO 0);
+SIGNAL fpu_readdatavalid:STD_LOGIC;
+SIGNAL fpu_readdata:STD_LOGIC_VECTOR(ddr_data_width_c-1 DOWNTO 0);
 
 -- Task control
 
@@ -276,6 +316,11 @@ SIGNAL ddr_read_end:vectors_t(fork_ddr_c-1 downto 0);
 
 SIGNAL dp_waitrequest:STD_LOGIC;
 SIGNAL ddr_tx_busy:STD_LOGIC;
+SIGNAL fpu_busy:STD_LOGIC;
+SIGNAL fpu_busy_vm:STD_LOGIC_VECTOR(1 DOWNTO 0);
+SIGNAL fpu_exe:STD_LOGIC;
+SIGNAL fpu_exe2:STD_LOGIC;
+SIGNAL fpu_exe_vm:STD_LOGIC;
 BEGIN
 
 
@@ -308,8 +353,8 @@ sram_read_fork <= dp_sram_read_fork;
 
 -- Generate waitrequest to DP when there is a conflict with MCORE while accessing SRAM
 
-dp_sram_read_wait <= '0';
-dp_sram_write_wait <= '0';
+--dp_sram_read_wait <= '0';
+--dp_sram_write_wait <= '0';
 
 -- Generate waitrequest to DP when there is a conflict with MCORE while accessing PCORE
 
@@ -465,15 +510,44 @@ sram_i: sram_core
         dp_rd_fork_in => sram_read_fork,
         dp_wr_fork_in => sram_write_fork,    
         dp_write_in => sram_write_enable,
+        dp_write_wait_out => dp_sram_write_wait,
         dp_write_vector_in => sram_write_vector,
         dp_read_in => sram_read_enable,
+        dp_read_wait_out => dp_sram_read_wait,
         dp_read_vm_in => sram_read_vm,
         dp_read_vector_in => sram_read_vector,
         dp_read_gen_valid_in => sram_read_gen_valid,
         dp_writedata_in => sram_write_data,
         dp_readdatavalid_out => sram_read_data_valid,
         dp_readdatavalid_vm_out => sram_readdata_vm,
-        dp_readdata_out => sram_read_data);       
+        dp_readdata_out => sram_read_data,
+        
+        -- FPU interface
+        
+        fpu_rd_addr_in => fpu_rd_addr,
+        fpu_wr_addr_in => fpu_wr_addr,        
+        fpu_write_in => fpu_write,
+        fpu_write_wait_out => fpu_write_wait,
+        fpu_read_in => fpu_read,
+        fpu_read_wait_out => fpu_read_wait,
+        fpu_writedata_in => fpu_writedata,
+        fpu_writebe_in => fpu_writebe,
+        fpu_readdatavalid_out => fpu_readdatavalid,
+        fpu_readdata_out => fpu_readdata,
+
+        -- AXI interface to access SRAM
+        axislave_araddr_in => axislave_araddr_in,
+        axislave_arburst_in => axislave_arburst_in,
+        axislave_arlen_in => axislave_arlen_in,
+        axislave_arready_out => axislave_arready_out,
+        axislave_arsize_in => axislave_arsize_in,
+        axislave_arvalid_in => axislave_arvalid_in,
+        axislave_rdata_out => axislave_rdata_out,
+        axislave_rlast_out => axislave_rlast_out,
+        axislave_rready_in => axislave_rready_in,
+        axislave_rresp_out => axislave_rresp_out,
+        axislave_rvalid_out => axislave_rvalid_out
+        );       
 
 
 ---------
@@ -587,6 +661,66 @@ ddr_tx_i: ddr_tx
         ddr_tx_busy_out=>ddr_tx_busy
         );
 
+host_readdatavalid <= host_fpu_readdatavalid or host_dp_readdatavalid;
+host_writewait <= host_fpu_writewait or host_dp_writewait;
+host_readwait <= host_fpu_readwait or host_dp_readwait;
+
+--------
+-- Floating point unit
+--------
+
+GEN1: IF(FPU_ENABLED=TRUE) GENERATE
+fpu_i:fpu
+    port map(
+        clock_in=>clock_in,
+        reset_in=>reset_in,
+    
+        bus_waddr_in=>host_waddr(register_addr_t'length+2-1 downto 2),
+        bus_raddr_in=>host_raddr(register_addr_t'length+2-1 downto 2),
+        bus_write_in=>host_wren,
+        bus_read_in=>host_rden,
+        bus_writedata_in=>host_writedata,
+        bus_readdata_out=>host_readdata,
+        bus_readdatavalid_out=>host_fpu_readdatavalid,
+        bus_writewait_out=>host_fpu_writewait,
+        bus_readwait_out=>host_fpu_readwait,
+
+        fpu_rd_addr_out => fpu_rd_addr,
+        fpu_wr_addr_out => fpu_wr_addr,        
+        fpu_write_out => fpu_write,
+        fpu_write_wait_in => fpu_write_wait,
+        fpu_read_out => fpu_read,
+        fpu_read_wait_in => fpu_read_wait,
+        fpu_writedata_out  => fpu_writedata,
+        fpu_writebe_out  => fpu_writebe,
+        fpu_readdatavalid_in => fpu_readdatavalid,
+        fpu_readdata_in => fpu_readdata,
+
+        fpu_busy_vm_out => fpu_busy_vm,
+
+        fpu_exe_in => fpu_exe,
+
+        fpu_exe_vm_in => fpu_exe_vm,
+
+        fpu_exe_out => fpu_exe2
+    );
+END GENERATE GEN1;
+
+GEN2: IF(FPU_ENABLED=FALSE) GENERATE
+
+host_fpu_readdatavalid <= '0';
+host_fpu_writewait <= '0';
+host_fpu_readwait <= '0';
+fpu_rd_addr <= (others=>'0');
+fpu_wr_addr <= (others=>'0');        
+fpu_write <= '0';
+fpu_read <= '0';
+fpu_writedata <= (others=>'0');
+fpu_writebe <= (others=>'0');
+fpu_busy_vm <= (others=>'0');
+fpu_exe2 <= '0';
+
+END GENERATE GEN2;
 
 --------
 -- Instantiate data plane processor
@@ -606,9 +740,9 @@ dp_1_i: dp_core
         bus_read_in=>host_rden,
         bus_writedata_in=>host_writedata,
         bus_readdata_out=>host_readdata,
-        bus_readdatavalid_out=>host_readdatavalid,
-        bus_writewait_out=>host_writewait,
-        bus_readwait_out=>host_readwait,
+        bus_readdatavalid_out=>host_dp_readdatavalid,
+        bus_writewait_out=>host_dp_writewait,
+        bus_readwait_out=>host_dp_readwait,
 
         -- Bus interface for read master to PCORE
 
@@ -738,6 +872,12 @@ dp_1_i: dp_core
         bar_in=>bar,
 
         indication_avail_out => open,
+
+        fpu_busy_vm_in => fpu_busy_vm,
+
+        fpu_exe_out => fpu_exe,
+
+        fpu_exe_vm_out => fpu_exe_vm,
         
         ddr_tx_busy_in => ddr_tx_busy
     );
@@ -802,5 +942,4 @@ core_i: core
         busy_out => busy,
         ready_out => ready
     );
-
 END ztachip_behavior;

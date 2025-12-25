@@ -649,25 +649,14 @@ bool cInstruction::simplifyMU(Instruction_alu *_mu)
          //TODO Replace with ACC_ADD operation
          assert(0);
          break;
-      case cConfig::OPCODE_GET_MANTISSA:
+      case cConfig::OPCODE_LSB4:
          assert(0);
          break;
-      case cConfig::OPCODE_GET_EXPONENT:
+      case cConfig::OPCODE_MSB4:
          assert(0);
          break;
-      case cConfig::OPCODE_SET_EXPONENT:
-         {
-         float v=(float)_mu->x1->getConstant();
-         unsigned int v2=*((unsigned int *)&v);
-         float v3;
-         int ival=(int)(_mu->x2->getConstant());
-         v2 = (v2&(~0x7f800000))|((ival&0xff) << 23);
-         v3 = *((float *)&v2);
-         _mu->x1 = new cTerm_MU_Constant((float)v3);
-         _mu->x2 = new cTerm_MU_Null();
-         _mu->oc = cConfig::OPCODE_ASSIGN;
-         }
-         rc=true;
+      case cConfig::OPCODE_CONV_BFLOAT:
+         assert(0);
          break;
       case cConfig::OPCODE_SET_FLOAT:
          {
@@ -2521,6 +2510,15 @@ bool cInstruction::fm_post(cInstruction *begin)
             error(instruction->getBeginFunc()->m_lineNo,"Invalid operations involved double");
          instruction->m_alu1.oc=cConfig::OPCODE_SHLA;
          instruction->m_alu1.x1=new cTerm_MU_Constant((int)0);
+         instruction->m_alu1.x2= new cTerm_MU_Null();
+         instruction->m_alu1.xacc=xacc;
+      }
+      else if (instruction->m_alu1.oc == cConfig::OPCODE_CONV_BFLOAT)
+      {
+         if(!x->isKindOf(cTerm_MU_Null::getCLID()))
+            error(instruction->getBeginFunc()->m_lineNo,"Invalid operations involved double");
+         instruction->m_alu1.oc=cConfig::OPCODE_CONV;
+         instruction->m_alu1.x1=new cTerm_MU_Null();
          instruction->m_alu1.x2= new cTerm_MU_Null();
          instruction->m_alu1.xacc=xacc;
       }

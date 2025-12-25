@@ -74,17 +74,24 @@
 #include "../fs/gen/detect.c"
 #include "../fs/gen/labelmap.c"
 #endif
+#include "../thirdparty/FatFs/ff.h"
 
 // This file implements functions required by newlib
 // Functions implement filesystem calls, task management and memory management
 
 #define FP_FIRST    (STDERR_FILENO+1)
+
 #define FP_MAX_NUM  16
 
 extern void _heap_start();
+
 extern void _heap_end();
 
 static unsigned int heap=(unsigned int)_heap_start;
+
+static bool usd_is_init=false;
+
+static FATFS FatFs;
 
 // List of files opened
 
@@ -92,19 +99,14 @@ static struct {
    bool status;
    int len;
    int curr;
+   FIL fp;
    const uint8_t *body;
 } files[FP_MAX_NUM];
-
-// Kill a process
-// Not implemented...
 
 int _kill(int pid, int sig) {
     errno = EINVAL;
     return -1;
 }
-
-// Get process id
-// There is only one process
 
 int _getpid(void) {
     return 1;
@@ -115,9 +117,6 @@ int _getpid(void) {
 int _isatty(int file) {
     return (file == STDOUT_FILENO || file == STDERR_FILENO);
 }
-
-// Exit a process
-// Not implemented
 
 void _exit(int code) {
     for(;;) {}
@@ -148,7 +147,11 @@ unsigned int heap_avail() {
 // There are some files pre-defined as C array
 
 int _open(const char *name, int flags, int mode) {
+#ifdef SIMULATION
+   return -1;
+#else
    int i;
+   FILINFO finfo;
    for(i=0;i < FP_MAX_NUM;i++) {
       if(!files[i].status)
          break;
@@ -157,7 +160,6 @@ int _open(const char *name, int flags, int mode) {
       errno = ENOENT;
       return -1;
    }
-#ifndef SIMULATION
    if(strcmp(name,"alphabet.bmp")==0) {
       files[i].status=true;
       files[i].curr=0;
@@ -380,33 +382,73 @@ int _open(const char *name, int flags, int mode) {
       files[i].len=sizeof(detect_classes);
       files[i].body=detect_classes;
 #endif
-   } else {
-      errno = ENOENT;
-      return -1;
+   } 
+   else 
+   {
+      if(!usd_is_init) {
+         if(f_mount(&FatFs, "", 0) != FR_OK) {
+            errno = ENOENT;
+            return -1;            
+         }
+         usd_is_init = true;
+      }
+      if(f_open(&files[i].fp,name,FA_READ)==FR_OK) {
+         f_stat (name,&finfo); 
+         files[i].status=true;
+         files[i].curr=0;
+         files[i].len=finfo.fsize;
+         files[i].body=0; // body=0 means this is not a RAM based file      
+      } else {
+         errno = ENOENT;
+         return -1;
+      }
    }
    return i+FP_FIRST;
-#else
-   errno = ENOENT;
-   return -1;
 #endif
 }
 
 // Close a file
 
 int _close(int file) {
+#ifdef SIMULATION
+   return -1;
+#else
    file -= FP_FIRST;
    if((file < 0 || file >= FP_MAX_NUM) || !files[file].status) {
       errno = EBADF;
       return -1;
    }
    files[file].status=false;
+   if(files[file].body==0) {
+      f_close(&files[file].fp);
+   }
    return 0;
+#endif
 }
 
 // Read from an opened file
 
+#ifdef SIMULATION
+
+ssize_t _read(int file, void *ptr, size_t len) {
+   return 0;
+}
+int _fstat(int file, struct stat *st) {
+   return 0;
+}
+ssize_t _write(int fd, const void *ptr, size_t len) {
+   return 0;
+}
+off_t _lseek(int file, off_t ptr, int dir) {
+   return 0;
+}
+
+#else
+
 ssize_t _read(int file, void *ptr, size_t len) {
    int remain;
+   int len2;
+
    file -= FP_FIRST;
    if((file < 0 || file >= FP_MAX_NUM) || !files[file].status) {
       errno = EBADF;
@@ -415,7 +457,11 @@ ssize_t _read(int file, void *ptr, size_t len) {
    remain=files[file].len-files[file].curr;
    if(len > remain)
       len=remain;
-   memcpy(ptr,files[file].body+files[file].curr,len);
+   if(files[file].body)
+      memcpy(ptr,files[file].body+files[file].curr,len);
+   else {
+      f_read(&files[file].fp,ptr,len,&len2);
+   }
    files[file].curr += len;
    return len;
 }
@@ -468,5 +514,8 @@ off_t _lseek(int file, off_t ptr, int dir) {
       files[file].curr=files[file].len;
    if(files[file].curr>files[file].len)
       files[file].curr=files[file].len;
+   if(files[file].body==0)
+      f_lseek(&files[file].fp,files[file].curr);
    return files[file].curr;
 }
+#endif

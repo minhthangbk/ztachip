@@ -13,7 +13,7 @@ package config is
 -- configure ztachip size
 -- Choose appropriate size that fits your targeted FPGA
 -- ztachip supported 2 sizes below
------------------------------------------------------------
+-------------------------------------------------------------
 
 --LARGE VERSION
 constant pid_gen_max_c: integer:=8;
@@ -40,15 +40,37 @@ constant min_mem_depth_c:integer:=512;
 ---------------------------------------------------------------
 -- Specify data width to external memory
 -- ztachip accesses external memory via AXI bus protocol
--- ztachip supports 32-bit or 64-bit AXI bus width for external
--- memory access
+-- ztachip supports 32-bit, 64-bit or 128-bit AXI bus width for 
+-- external memory access
 ---------------------------------------------------------------
+
+constant exmem_data_width_c:integer:=128;
+
+--constant exmem_data_width_c:integer:=64;
 
 --constant exmem_data_width_c:integer:=32;
 
-constant exmem_data_width_c:integer:=64;
-
+---------------------------------------------------------------
 -- Main clock speed
+---------------------------------------------------------------
+
 constant main_clock_c:integer:=125000000;
+
+---------------------------------------------------------------
+-- Enable/disable FPU. This option is required to run LLM models
+----------------------------------------------------------------
+ 
+--constant fpu_enabled_c:boolean:=TRUE;
+
+constant fpu_enabled_c:boolean:=FALSE;
+
+---------------------------------------------------------------
+-- Max tensor size in log2
+-- Max tensor size = 2**MAX_TENSOR_LOG2_SIZE
+---------------------------------------------------------------
+
+--constant MAX_TENSOR_LOG2_SIZE: integer:=28;
+
+constant MAX_TENSOR_LOG2_SIZE: integer:=24;
 
 end;

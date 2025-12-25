@@ -35,15 +35,15 @@ use work.ztachip_pkg.all;
        signal apb_prdata            : OUT STD_LOGIC_VECTOR(31 downto 0);
        signal apb_pslverror         : OUT STD_LOGIC;
 
-       signal led_out               : out std_Logic_vector(3 downto 0);
-       signal button_in             : in std_logic_vector(3 downto 0)       
+       signal led_out               : out std_Logic_vector(15 downto 0);
+       signal button_in             : in std_logic_vector(15 downto 0)       
     );
  end gpio;
   
 architecture Behavioral of gpio is  
-signal led_r:std_logic_vector(3 downto 0);
-signal button_r:std_logic_vector(3 downto 0);
-signal button_rr:std_logic_vector(3 downto 0);
+signal led_r:std_logic_vector(15 downto 0);
+signal button_r:std_logic_vector(15 downto 0);
+signal button_rr:std_logic_vector(15 downto 0);
 signal apb_led_match:std_logic;
 signal apb_pb_match:std_logic;
 signal apb_match:std_logic;

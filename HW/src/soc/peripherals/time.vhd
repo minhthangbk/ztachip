@@ -40,23 +40,30 @@ use work.ztachip_pkg.all;
 architecture Behavioral of TIMER is  
 constant clock_divider_c:integer:=main_clock_c/1000;
 signal match:std_logic;
+signal match2:std_logic;
 signal time_r:unsigned(31 downto 0);
+signal time2_r:unsigned(31 downto 0);
 signal usec_r: integer range 0 to clock_divider_c-1;
 begin
 
 match <= apb_penable when (apb_paddr(apb_addr_len_c-1 downto 0)=std_logic_vector(to_unsigned(apb_time_get_c,apb_addr_len_c))) else '0';
 
-apb_pready <= '1' when (match='1') else 'Z';
+match2 <= apb_penable when (apb_paddr(apb_addr_len_c-1 downto 0)=std_logic_vector(to_unsigned(apb_time2_get_c,apb_addr_len_c))) else '0';
+
+apb_pready <= '1' when (match='1' or match2='1') else 'Z';
 
 apb_prdata <= std_logic_vector(time_r) when (match='1') else (others=>'Z');
 
-apb_pslverror <= '0' when (match='1') else 'Z';
+apb_prdata <= std_logic_vector(time2_r) when (match2='1') else (others=>'Z');
+
+apb_pslverror <= '0' when (match='1' or match2='1') else 'Z';
 
 
 process(clock_in)
 begin
    if reset_in = '0' then
       time_r <= (others=>'0');
+      time2_r <= (others=>'0');
       usec_r <= 0;
    else
       if rising_edge(clock_in) then
@@ -68,6 +75,7 @@ begin
          if(usec_r=0) then
             time_r <= time_r+1;
          end if;
+         time2_r <= time2_r + 1;
       end if;
    end if;  
 end process;

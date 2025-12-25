@@ -29,8 +29,6 @@ read_vhdl ../../src/pcore/stream.vhd
 read_vhdl ../../src/pcore/xregister_file.vhd
 read_vhdl ../../src/soc/soc_base.vhd
 read_vhdl ../../src/soc/tcm.vhd
-read_vhdl ../../src/soc/tcm_read.vhd
-read_vhdl ../../src/soc/tcm_write.vhd
 read_vhdl ../../src/soc/axi/axi_apb_bridge.vhd
 read_vhdl ../../src/soc/axi/axi_merge.vhd
 read_vhdl ../../src/soc/axi/axi_merge_read.vhd
@@ -42,7 +40,10 @@ read_vhdl ../../src/soc/axi/axi_split_write.vhd
 read_vhdl ../../src/soc/axi/axi_stream_read.vhd
 read_vhdl ../../src/soc/axi/axi_stream_write.vhd
 read_vhdl ../../src/soc/axi/axi_write.vhd
-read_vhdl ../../src/soc/axi/axi_convert_64to32.vhd
+read_vhdl ../../src/soc/axi/axi_ram_read.vhd
+read_vhdl ../../src/soc/axi/axi_ram_write.vhd
+read_vhdl ../../src/soc/axi/axi_resize_read.vhd
+read_vhdl ../../src/soc/axi/axi_resize_write.vhd
 read_vhdl ../../src/soc/peripherals/camera.vhd
 read_vhdl ../../src/soc/peripherals/gpio.vhd
 read_vhdl ../../src/soc/peripherals/vga.vhd
@@ -70,6 +71,14 @@ read_vhdl ../../src/util/arbiter.vhd
 read_vhdl ../../src/util/afifo.vhd
 read_vhdl ../../src/util/afifo2.vhd
 read_vhdl ../../src/util/adder.vhd
+read_vhdl ../../src/fpu/falu_core.vhd
+read_vhdl ../../src/fpu/falu2.vhd
+read_vhdl ../../src/fpu/falu.vhd
+read_vhdl ../../src/fpu/fp12.vhd
+read_vhdl ../../src/fpu/fp2int.vhd
+read_vhdl ../../src/fpu/fp_floor.vhd
+read_vhdl ../../src/fpu/fpmax.vhd
+read_vhdl ../../src/fpu/fpu.vhd
 read_verilog ../../platform/Xilinx/CCD_SYNC.v
 read_verilog ../../platform/Xilinx/SYNC_LATCH.v
 read_verilog ../../platform/Xilinx/SHIFT.v
@@ -78,6 +87,8 @@ read_verilog ../../platform/Xilinx/DPRAM_DUAL_CLOCK.v
 read_verilog ../../platform/Xilinx/DPRAM.v
 read_verilog ../../platform/Xilinx/SPRAM_BE.v
 read_verilog ../../platform/Xilinx/SPRAM.v
+read_verilog ../../platform/Xilinx/FP32_MUL.v
+read_verilog ../../platform/Xilinx/FP32_ADDSUB.v
 
 read_xdc main.xdc
 
@@ -96,7 +107,29 @@ set_property -dict [list \
 			CONFIG.CLKOUT6_USED {true} \
 			CONFIG.CLKOUT6_REQUESTED_OUT_FREQ {250.000} \
 			CONFIG.RESET_TYPE {ACTIVE_LOW}] [get_ips clk_wiz_0]
+
 generate_target all [get_files ztachip.srcs/sources_1/ip/clk_wiz_0/clk_wiz_0.xci]
+
+create_ip -name floating_point -vendor xilinx.com -library ip -version 7.1 -module_name float_addsub
+set_property -dict [list \
+			CONFIG.Operation_Type {Add/Subtract} \
+			CONFIG.Maximum_Latency {False} \
+			CONFIG.C_Latency {4} \
+			CONFIG.Flow_Control {NonBlocking}] \
+			[get_ips float_addsub]
+
+generate_target all [get_files ztachip.srcs/sources_1/ip/float_addsub/float_addsub.xci]
+
+
+create_ip -name floating_point -vendor xilinx.com -library ip -version 7.1 -module_name float_mul
+set_property -dict [list \
+			CONFIG.operation_type {Multiply} \
+			CONFIG.Maximum_Latency {False} \
+			CONFIG.C_Latency {4} \
+			CONFIG.Flow_Control {NonBlocking}] \
+			[get_ips float_mul]
+
+generate_target all [get_files ztachip.srcs/sources_1/ip/float_mul/float_mul.xci]
 
 create_ip -name mig_7series -vendor xilinx.com -library ip -version 4.2 -module_name mig_7series_0
 

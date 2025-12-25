@@ -31,7 +31,8 @@ typedef enum {
    TensorDataTypeUint8,
    TensorDataTypeInt16,
    TensorDataTypeUint16,
-   TensorDataTypeFloat32
+   TensorDataTypeFloat32,
+   TensorDataTypeFloat16
 } TensorDataType;
 
 // Tensor format.

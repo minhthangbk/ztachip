@@ -21,6 +21,7 @@
 
 #include <stdint.h>
 #include "../base/types.h"
+#include "../base/zta.h"
 
 #define DISPLAY_WIDTH       640
 
@@ -60,12 +61,18 @@
 
 #define APB_TIME_GET          19 
 
+#define APB_TIME2_GET         20
+
 
 // Flush data cache with VexRiscv
 // This is dependent on the Riscv implementation since flushing datacache
 // is not defined in official Riscv specs
 
+#ifdef __WIN32__
+#define FLUSH_DATA_CACHE() {}
+#else
 #define FLUSH_DATA_CACHE()  {asm(".word 0x500F");}
+#endif
 
 extern uint8_t *DisplayCanvas;
 
@@ -100,5 +107,7 @@ int UartWriteAvailable();
 #endif
 
 #define TimeGet() (APB[APB_TIME_GET])
+
+#define Time2Get() (APB[APB_TIME2_GET])
 
 #endif

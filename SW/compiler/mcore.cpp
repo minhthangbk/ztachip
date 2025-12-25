@@ -61,39 +61,6 @@
 #include "instruction.h"
 #include "mcore.h"
 
-
-// Tokens used by mcore intepreter...
-#define TOKEN_NOP             "NOP"
-#define TOKEN_PCORE           "PCORE"
-#define TOKEN_PCORES          "PCORES"
-#define TOKEN_SRAM            "SCRATCH"
-#define TOKEN_SRAMH           "HSCRATCH"
-#define TOKEN_SRAMS           "SCRATCHS"
-#define TOKEN_DDR             "MEM"
-#define TOKEN_DDRS            "MEMS"
-#define TOKEN_EXE             "EXE"
-#define TOKEN_LOCKSTEP_EXE    "EXE_LOCKSTEP"
-#define TOKEN_PRINT           "PRINT"
-#define TOKEN_NOTIFY          "CALLBACK"
-#define TOKEN_LOG_ON          "LOG_ON"
-#define TOKEN_LOG_OFF         "LOG_OFF"
-#define TOKEN_BARRIER         "BARRIER"
-#define TOKEN_ALL_INT         "INT16"
-#define TOKEN_ALL_HALF        "HALF"
-#define TOKEN_ALL_SHORT       "INT8"
-#define TOKEN_FOR             "FOR"
-#define TOKEN_REPEAT          "REPEAT"
-#define TOKEN_PAD             "PAD"
-#define TOKEN_LATEST          "LATEST"
-#define TOKEN_THREAD          "THREAD"
-#define TOKEN_CONCURRENT      "CONCURRENT"
-#define TOKEN_SPU             "SPU"
-#define TOKEN_PCORE_PROG      "PROG"
-#define TOKEN_EXPORT          "EXPORT"
-#define TOKEN_VAR             "VAR"
-#define TOKEN_DTYPE           "DTYPE"
-#define TOKEN_REMAP           "REMAP"
-
 // PCORE layout
 
 #define TOKEN_PCORE_LAYOUT_N    "N"
@@ -111,9 +78,6 @@
 #define SPECIFIER_DDR_DIM        1
 #define SPECIFIER_ALL_VAL        0
 
-// Maximum of a line process by intepreter
-#define MAX_LINE  8000
-
 // Types of commands
 
 #define CMD_EXE         0
@@ -128,6 +92,7 @@
 #define CMD_EXPORT      9
 #define CMD_INCLUDE     10
 #define CMD_VAR         11
+#define CMD_FPU         12
 
 #define MAX_DP_STRIDE   6
 
@@ -547,6 +512,10 @@ int cMcoreTerm::Validate()
       {
          m_datatype = "INT16";
       }
+      else if (strcasecmp(m_dtype.c_str(), "BFLOAT") == 0)
+      {
+         m_datatype = "BFLOAT";
+      }
       else if (strcasecmp(m_dtype.c_str(), "INT8") == 0)
       {
          m_datatype = "INT8";
@@ -721,6 +690,10 @@ int cMcoreTerm::Validate()
       {
          m_datatype = "INT16";
       }
+      else if (strcasecmp(m_dtype.c_str(), "BFLOAT") == 0)
+      {
+         m_datatype = "BFLOAT";
+      }
       else if (strcasecmp(m_dtype.c_str(), "INT8") == 0)
       {
          m_datatype = "INT8";
@@ -791,6 +764,10 @@ int cMcoreTerm::Validate()
       if (strcasecmp(m_dtype.c_str(), "INT16") == 0)
       {
          m_datatype = "INT16";
+      }
+      else if (strcasecmp(m_dtype.c_str(), "BFLOAT") == 0)
+      {
+         m_datatype = "BFLOAT";
       }
       else if (strcasecmp(m_dtype.c_str(), "INT8") == 0)
       {
@@ -2472,7 +2449,29 @@ char *cMcore::scan_barrier(FILE *out, char *line)
    char token[MAX_LINE];
    line = scan_name(line, token);
    fprintf(out, "%s;ZTAM_GREG(0,%d,0)=(%d+(%d<<3));", s_ztamFifoReady, REG_DP_RUN,
-      DP_OPCODE_NULL, DP_CONDITION_ALL_FLUSH);
+      DP_OPCODE_NULL, DP_CONDITION_DP_DONE);
+   return line;
+}
+
+// Scan and generate a wait_fpu command
+char *cMcore::scan_wait_fpu(FILE *out, char *line)
+{
+   std::vector<std::string> specifier;
+   char token[MAX_LINE];
+   line = scan_name(line, token);
+   fprintf(out, "%s;ZTAM_GREG(0,%d,0)=(%d+(%d<<3));", s_ztamFifoReady, REG_DP_RUN,
+      DP_OPCODE_NULL, DP_CONDITION_FPU_IDLE);
+   return line;
+}
+
+// Scan and generate a FPU_EXE
+char *cMcore::scan_fpu_exe(FILE *out, char *line)
+{
+   std::vector<std::string> specifier;
+   char token[MAX_LINE];
+   line = scan_name(line, token);
+   fprintf(out, "%s;ZTAM_GREG(0,%d,0)=(%d+(%d<<3));", s_ztamFifoReady, REG_DP_RUN,
+      DP_OPCODE_FPU_EXE, 0);
    return line;
 }
 
@@ -2995,6 +2994,16 @@ char *cMcore::decode(char *line, FILE *out, int *cmd)
       *cmd = CMD_NOP;
       return scan_barrier(out, line);
    }
+   if (strcasecmp(token, TOKEN_WAIT_FPU) == 0)
+   {
+      *cmd = CMD_NOP;
+      return scan_wait_fpu(out, line);
+   }
+   if (strcasecmp(token, TOKEN_FPU_EXE) == 0)
+   {
+      *cmd = CMD_NOP;
+      return scan_fpu_exe(out, line);
+   }
    if (strcasecmp(token, TOKEN_VAR) == 0)
    {
       *cmd = CMD_VAR;
@@ -3010,6 +3019,18 @@ char *cMcore::decode(char *line, FILE *out, int *cmd)
       *cmd = CMD_TRANSFER;
       return scan_transfer(out, line);
    }
+   if (strcasestr(token, TOKEN_FMA) || 
+      strcasestr(token, TOKEN_MAC) || 
+      strcasestr(token, TOKEN_EXP) || 
+      strcasestr(token,TOKEN_RECIPROCAL) ||
+      strcasestr(token,TOKEN_MAX) ||
+      strcasestr(token,TOKEN_SUM) 
+      )
+   {
+      *cmd = CMD_FPU;
+      return scan_fpu(out, line);
+   }
+
    error(cMcore::M_currLine, "Syntax error");
    *cmd = -1;
    return 0;
@@ -3121,16 +3142,16 @@ bool cMcore::processLine(char *line, FILE *out)
                if (*p == ',')
                {
                   count++;
-                  if (cmd != CMD_TRANSFER && cmd != CMD_NOP)
-                     error(-1, "Only transfer commands can be concurrent");
+                  if (cmd != CMD_TRANSFER && cmd != CMD_FPU && cmd != CMD_NOP)
+                     error(-1, "Only transfer commands or FPU can be concurrent");
                   M_beginBlock = false;
                }
                else if (*p == ';')
                {
                   if (count > 0)
                   {
-                     if (cmd != CMD_TRANSFER && cmd != CMD_NOP)
-                        error(-1, "Only transfer commands can be concurrent");
+                     if (cmd != CMD_TRANSFER && cmd != CMD_FPU && cmd != CMD_NOP)
+                        error(-1, "Only transfer commands or FPU can be concurrent");
                   }
                   count = 0;
                   M_beginBlock = true;

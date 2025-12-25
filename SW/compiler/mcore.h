@@ -23,6 +23,52 @@
 
 #define MAX_MCORE_DEFINE   100
 
+// Maximum of a line process by intepreter
+#define MAX_LINE  8000
+
+
+// Tokens used by mcore intepreter...
+#define TOKEN_NOP             "NOP"
+#define TOKEN_PCORE           "PCORE"
+#define TOKEN_PCORES          "PCORES"
+#define TOKEN_SRAM            "SCRATCH"
+#define TOKEN_SRAMH           "HSCRATCH"
+#define TOKEN_SRAMS           "SCRATCHS"
+#define TOKEN_DDR             "MEM"
+#define TOKEN_DDRS            "MEMS"
+#define TOKEN_EXE             "EXE"
+#define TOKEN_LOCKSTEP_EXE    "EXE_LOCKSTEP"
+#define TOKEN_PRINT           "PRINT"
+#define TOKEN_NOTIFY          "CALLBACK"
+#define TOKEN_LOG_ON          "LOG_ON"
+#define TOKEN_LOG_OFF         "LOG_OFF"
+#define TOKEN_BARRIER         "BARRIER"
+#define TOKEN_WAIT_FPU        "WAIT_FPU"
+#define TOKEN_FPU_EXE         "FPU_EXE"
+#define TOKEN_ALL_INT         "INT16"
+#define TOKEN_ALL_HALF        "HALF"
+#define TOKEN_ALL_SHORT       "INT8"
+#define TOKEN_FOR             "FOR"
+#define TOKEN_REPEAT          "REPEAT"
+#define TOKEN_PAD             "PAD"
+#define TOKEN_LATEST          "LATEST"
+#define TOKEN_THREAD          "THREAD"
+#define TOKEN_CONCURRENT      "CONCURRENT"
+#define TOKEN_SCATTER         "SCATTER"
+#define TOKEN_SPU             "SPU"
+#define TOKEN_PCORE_PROG      "PROG"
+#define TOKEN_EXPORT          "EXPORT"
+#define TOKEN_VAR             "VAR"
+#define TOKEN_DTYPE           "DTYPE"
+#define TOKEN_REMAP           "REMAP"
+#define TOKEN_FMA             "FPU.FMA"
+#define TOKEN_MAC             "FPU.MAC"
+#define TOKEN_EXP             "FPU.EXP"
+#define TOKEN_RECIPROCAL      "FPU.RECIPROCAL"
+#define TOKEN_MAX             "FPU.MAX"
+#define TOKEN_SUM             "FPU.SUM"
+
+
 class cMcoreRange;
 
 class cMcoreSpecifier
@@ -176,6 +222,8 @@ public:
    static char *scan_term(char *line,cMcoreTerm *term);
    static char *scan_exe(FILE *out,char *line,bool lockstep);
    static char *scan_barrier(FILE *out,char *line);
+   static char *scan_wait_fpu(FILE *out,char *line);
+   static char *scan_fpu_exe(FILE *out,char *line);
    static char *scan_notify(FILE *out,char *line);
    static char *scan_print(FILE *out,char *line);
    static char *scan_log_on(FILE *out,char *line,bool sync);
@@ -185,6 +233,7 @@ public:
    static char *scan_define(FILE *out,char *line);
    static char *scan_var(FILE *out,char *line);
    static char *scan_transfer(FILE *out,char *line);
+   static char *scan_fpu(FILE *out,char *line);
    static char *scan_specifier(std::vector<cMcoreSpecifier> *_specifier,char *line,int _level=0);
    static char *skipWS(char *line);
 private:

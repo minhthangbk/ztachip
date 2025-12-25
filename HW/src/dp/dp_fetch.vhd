@@ -99,6 +99,9 @@ ENTITY dp_fetch IS
             SIGNAL sram_read_pending_p1_in  : STD_LOGIC_VECTOR(NUM_DP_DST_PORT-1 downto 0);
             SIGNAL ddr_read_pending_p1_in   : STD_LOGIC_VECTOR(NUM_DP_DST_PORT-1 downto 0);
             
+            SIGNAL fpu_busy_vm_in           : IN STD_LOGIC_VECTOR(1 DOWNTO 0);
+            SIGNAL fpu_exe_out              : OUT STD_LOGIC;
+            SIGNAL fpu_exe_vm_out           : OUT STD_LOGIC;
             SIGNAL ddr_tx_busy_in           : IN STD_LOGIC
     );
 END dp_fetch;
@@ -249,6 +252,8 @@ SIGNAL curr_vm_r:STD_LOGIC;
 SIGNAL pcore_sink_busy_r:std_logic_vector(1 downto 0);
 SIGNAL sram_sink_busy_r:std_logic_vector(1 downto 0);
 SIGNAL ddr_sink_busy_r:std_logic;
+
+SIGNAL fpu_busy_vm:STD_LOGIC_VECTOR(1 DOWNTO 0);
 
 -- Pack template into a linear buffer
 
@@ -930,8 +935,17 @@ SIGNAL bus_writedata_r:STD_LOGIC_VECTOR(host_width_c-1 DOWNTO 0);
 SIGNAL rden_r:STD_LOGIC;
 SIGNAL avail:std_logic_vector(dp_max_gen_c-1 downto 0);
 SIGNAL indication_empty:STD_LOGIC;
+SIGNAL fpu_exe_r:STD_LOGIC;
+SIGNAL fpu_exe_rr:STD_LOGIC;
+SIGNAL fpu_exe_rrr:STD_LOGIC;
+SIGNAL fpu_exe_vm_r:STD_LOGIC;
+SIGNAL fpu_exe_vm_rr:STD_LOGIC;
+SIGNAL fpu_exe_vm_rrr:STD_LOGIC;
 begin
 
+
+fpu_exe_out <= fpu_exe_r;
+fpu_exe_vm_out <= fpu_exe_vm_r;
 indication_avail_out <= not indication_empty;
 task_start_addr_out <= task_start_addr_r;
 task_pending_out <= task_r;
@@ -945,6 +959,11 @@ task_lockstep_out <= task_lockstep_r;
 task_tid_mask_out <= task_tid_mask_r;
 task_iregister_auto_out <= task_iregister_auto_r;
 task_data_model_out <= task_data_model_r;
+
+fpu_busy_vm(0) <= fpu_busy_vm_in(0) or ((not fpu_exe_vm_r) and fpu_exe_r) or ((not fpu_exe_vm_rr) and fpu_exe_rr) or ((not fpu_exe_vm_rrr) and fpu_exe_rrr);
+
+fpu_busy_vm(1) <= fpu_busy_vm_in(1) or ((fpu_exe_vm_r) and fpu_exe_r) or ((fpu_exe_vm_rr) and fpu_exe_rr) or ((fpu_exe_vm_rrr) and fpu_exe_rrr);
+
 
 avail <= ready_in and (not instruction_valid_r) and (not instruction_valid_rr);
 
@@ -1023,31 +1042,31 @@ end process;
 
 log_wrreq2 <= log_wrreq and log_enable_r and (not log_full);
 
-log_fifo_i:scfifo
-	generic map 
-	(
-		DATA_WIDTH=>2*host_width_c,
-		FIFO_DEPTH=>log_depth_c,
-      LOOKAHEAD=>TRUE
-	)
-	port map 
-	(
-      clock_in=>clock_in,
-      reset_in=>reset_in,
-      data_in=>log_write,
-      write_in=>log_wrreq2,
-      read_in=>log_rdreq,
-      q_out=>log_read,
-      ravail_out=>open,
-      wused_out=>open,
-      empty_out=>log_empty,
-      full_out=>log_full,
-      almost_full_out=>open
-	);
+--log_fifo_i:scfifo
+--	generic map 
+--	(
+--		DATA_WIDTH=>2*host_width_c,
+--		FIFO_DEPTH=>log_depth_c,
+--      LOOKAHEAD=>TRUE
+--	)
+--	port map 
+--	(
+--     clock_in=>clock_in,
+--      reset_in=>reset_in,
+--      data_in=>log_write,
+--      write_in=>log_wrreq2,
+--      read_in=>log_rdreq,
+--      q_out=>log_read,
+--      ravail_out=>open,
+--      wused_out=>open,
+--      empty_out=>log_empty,
+--      full_out=>log_full,
+--      almost_full_out=>open
+--	);
 
---log_empty <= '1';
---log_full <= '0';
---log_read <= (others=>'0');
+log_empty <= '1';
+log_full <= '0';
+log_read <= (others=>'0');
 
 ----------
 -- FIFO to store incoming DP instructions from mcore
@@ -1159,7 +1178,7 @@ sram_read_pending <= sram_read_pending_p0_in or sram_read_pending_p1_in;
 
 ddr_read_pending <= ddr_read_pending_p0_in or ddr_read_pending_p1_in;
 
-bus_readdata_out <= bus_readdata_r;
+bus_readdata_out <= bus_readdata_r when rden_r='1' else (others=>'Z');
 
 bus_readdatavalid_out <= rden_r;
 
@@ -1634,20 +1653,30 @@ end process;
 process(valids,orecs,task_busy_in,indication_full_r,pcore_read_pending,sram_read_pending,ddr_read_pending,
        sink_pcore_busy_r,sink_sram_busy_r,sink_ddr_busy_r,task_ready_in,task_r,task_early_transfer_r,task_vm_r,
        pcore_source_busy_r,sram_source_busy_r,ddr_source_busy_r,
-       new_cmd_is_safe_r)
+       new_cmd_is_safe_r,fpu_busy_vm)
 variable pause_v:std_logic;
 begin
 FOR I in 0 to 1 loop
 if valids(I)='1' then
     if indication_full_r='1' then
        pauses(I) <= '1';
-    elsif (orecs(I).opcode /= dp_opcode_transfer_c) and (orecs(I).condition and (condition_vm0_busy_r or condition_vm1_busy_r)) /= std_logic_vector(to_unsigned(0,dp_condition_t'length)) then
-        -- Wait for all transfers to register space to be flushed
-        pauses(I) <= '1';
-    elsif (orecs(I).opcode = dp_opcode_transfer_c) and (orecs(I).vm='0') and (orecs(I).condition and condition_vm0_busy_r) /= std_logic_vector(to_unsigned(0,dp_condition_t'length)) then
-        pauses(I) <= '1';
-    elsif (orecs(I).opcode = dp_opcode_transfer_c) and (orecs(I).vm='1') and (orecs(I).condition and condition_vm1_busy_r) /= std_logic_vector(to_unsigned(0,dp_condition_t'length)) then
-        pauses(I) <= '1';
+   elsif (orecs(I).condition(dp_condition_fpu_idle_c)='1' and (fpu_busy_vm(0)='1' or fpu_busy_vm(1)='1')) then
+       pauses(I) <= '1';
+   elsif (orecs(I).opcode = dp_opcode_fpu_exe_c) then
+      -- Before FPU can begin, all transaction to SRAM must be completed already and FPU is idle
+      if((orecs(I).vm='0' and (condition_vm0_busy_r(dp_condition_sram_flush_c)='1' or fpu_busy_vm(0)='1')) or
+         (orecs(I).vm='1' and (condition_vm1_busy_r(dp_condition_sram_flush_c)='1' or fpu_busy_vm(1)='1'))) then
+         pauses(I) <= '1';
+      else
+         pauses(I) <= '0';
+      end if;
+   elsif (orecs(I).opcode /= dp_opcode_transfer_c) and (orecs(I).condition and (condition_vm0_busy_r or condition_vm1_busy_r)) /= std_logic_vector(to_unsigned(0,dp_condition_t'length)) then
+      -- Wait for all transfers to register space to be flushed
+      pauses(I) <= '1';
+   elsif (orecs(I).opcode = dp_opcode_transfer_c) and (orecs(I).vm='0') and (orecs(I).condition and condition_vm0_busy_r) /= std_logic_vector(to_unsigned(0,dp_condition_t'length)) then
+      pauses(I) <= '1';
+   elsif (orecs(I).opcode = dp_opcode_transfer_c) and (orecs(I).vm='1') and (orecs(I).condition and condition_vm1_busy_r) /= std_logic_vector(to_unsigned(0,dp_condition_t'length)) then
+      pauses(I) <= '1';
 	elsif orecs(I).opcode=dp_opcode_exec_vm_c and orecs(I).vm='0' then
         -- To proceed with kernel execution, make sure all read access to PCORE are completed.
         -- Task lauch is further delayed when there is outstanding write request to PCORE (indicated by sink_pcore_busy_r) 
@@ -1673,7 +1702,22 @@ if valids(I)='1' then
                -- An task execution is pending on a process. Block any transfer to/from to PCORE memory space of this process
                -- If task execution is already spanwed, then all transfer to/from the PCORE memory space for this process running the execution
                -- will be blocked so it is safe to start the transfer.
-            pauses(I) <= '1';	  
+            pauses(I) <= '1';
+         elsif(
+            -- Block transfer if it involves SRAM while FPU is currently busy processing
+              (
+               (fpu_busy_vm(0)='1') and  
+               (orecs(I).vm='0') and 
+               (orecs(I).source_bus_id=to_unsigned(dp_bus_id_sram_c,dp_bus_id_t'length) or orecs(I).dest_bus_id=to_unsigned(dp_bus_id_sram_c,dp_bus_id_t'length))
+              )
+              or
+              (
+               (fpu_busy_vm(1)='1') and  
+               (orecs(I).vm='1') and 
+               (orecs(I).source_bus_id=to_unsigned(dp_bus_id_sram_c,dp_bus_id_t'length) or orecs(I).dest_bus_id=to_unsigned(dp_bus_id_sram_c,dp_bus_id_t'length))
+              )
+              ) then
+            pauses(I) <= '1'; 
          else
             pauses(I) <= not new_cmd_is_safe_r(to_integer(orecs(I).source_bus_id))(to_integer(orecs(I).dest_bus_id));
          end if;
@@ -1804,10 +1848,27 @@ end process;
 
 process(reset_in,clock_in)
 begin
-    if reset_in = '0' then
-       log_enable_r <= '0';
-    else
+   if reset_in = '0' then
+      log_enable_r <= '0';
+      fpu_exe_r <= '0';
+      fpu_exe_rr <= '0';
+      fpu_exe_rrr <= '0';
+      fpu_exe_vm_r <= '0';
+      fpu_exe_vm_rr <= '0';
+      fpu_exe_vm_rrr <= '0';
+   else
         if clock_in'event and clock_in='1' then
+           if((ready='1') and (pause='0') and (orec.opcode = dp_opcode_fpu_exe_c)) then
+               fpu_exe_r <= '1';
+               fpu_exe_vm_r <= orec.vm;
+           else
+               fpu_exe_r <= '0';
+               fpu_exe_vm_r <= '0';
+           end if;
+           fpu_exe_rr <= fpu_exe_r;
+           fpu_exe_rrr <= fpu_exe_rr;
+           fpu_exe_vm_rr <= fpu_exe_vm_r;
+           fpu_exe_vm_rrr <= fpu_exe_vm_rr;
            if ready='1' and pause='0' then
               if orec.opcode = dp_opcode_log_on_c then
                  log_enable_r <= '1';

@@ -140,9 +140,16 @@ function unpack_ddr_read_cmd(q_in: ddr_read_cmd_flat_t) return ddr_read_cmd_t is
    return rec_v;
 end function unpack_ddr_read_cmd;
 
+------
+-- Define max burst_len
+-- Actual max_burst_len is ddr_rx_max_burstlen_c-1
+------
+constant ddr_rx_max_burstlen_c:integer:=9; 
+
 ---- Constants
 ----
-constant read_record_fifo_depth_c:integer:=6;
+
+constant read_record_fifo_depth_c:integer:=7;
 constant read_record_fifo_size_c:integer:=(2**read_record_fifo_depth_c);
 
 constant all_ones_c:std_logic_vector(ddr_vector_depth_c-1 downto 0):=(others=>'1');
@@ -221,7 +228,6 @@ SIGNAL read_pending_full_r:std_logic;
 
 SIGNAL read_transaction_complete_r:unsigned(4+ddr_max_read_transaction_pend_depth_c-1 downto 0);
 SIGNAL read_transaction_request_r:unsigned(4+ddr_max_read_transaction_pend_depth_c-1 downto 0);
-
 
 BEGIN
 
@@ -348,7 +354,7 @@ read_record_fifo_i:scfifo
         DATA_WIDTH=>read_record_t'length,
         FIFO_DEPTH=>read_record_fifo_depth_c,
         LOOKAHEAD=>TRUE,
-        ALMOST_FULL=>read_record_fifo_size_c-ddr_max_burstlen_c-5
+        ALMOST_FULL=>read_record_fifo_size_c-ddr_rx_max_burstlen_c-5
 	)
 	port map 
 	(
@@ -401,10 +407,10 @@ burstbegin <= '1' when (read2='1' and read_burstlen_r=to_unsigned(0,burstlen_t'l
 ddr_read <= '1' when (burstbegin='1' and read2='1') else '0';
 
 ------------------
--- Align burstlen to address boundary
+-- Calculate burst length
 ------------------
 
-process(read_burstlen_in,read_vector_in,read_addr)
+process(read_burstlen_in,read_vector_in,read_addr,read_piggyback_r)
    variable burstlen_v:unsigned(burstlen_t'length+ddr_vector_depth_c downto 0);
    variable temp_v:unsigned(burstlen_t'length+ddr_vector_depth_c downto 0);
    variable addr_v:unsigned(burstlen_t'length+ddr_vector_depth_c downto 0);
@@ -412,31 +418,71 @@ process(read_burstlen_in,read_vector_in,read_addr)
    variable temp4_v:unsigned(burstlen_t'length+ddr_vector_depth_c downto 0);
    variable temp5_v:unsigned(burstlen_t'length+ddr_vector_depth_c downto 0);
    variable temp6_v:unsigned(burstlen_t'length+ddr_vector_depth_c downto 0);
+   variable max_burst_len_v:integer;
    begin
-
    burstlen_v := resize(read_burstlen_in,burstlen_v'length);
    addr_v := resize(unsigned(read_addr(ddr_vector_depth_c-1 downto 0)),addr_v'length);
-   if unsigned(read_vector_in)=to_unsigned(1,ddr_vector_depth_c) then 
-      if burstlen_v > to_unsigned((ddr_vector_width_c/2)*(ddr_max_burstlen_c-1),burstlen_v'length) then
-         burstlen_v := to_unsigned((ddr_vector_width_c/2)*(ddr_max_burstlen_c-1),burstlen_v'length);
+   if(addr_v(ddr_vector_depth_c-1 downto 0)=to_unsigned(0,ddr_vector_depth_c) or (read_piggyback_r='1')) then
+      --------------
+      -- Calculate burst length when starting read address is aligned to 64-bit boundary or this read
+      -- is a partially full-filled by previous read
+      -- In this case we use up to maximum burst length allowed
+      -------------- 
+
+      -- Calculate burst length for different vector format
+
+      if unsigned(read_vector_in)=to_unsigned(1,ddr_vector_depth_c) then 
+         if burstlen_v > to_unsigned((ddr_vector_width_c/2)*(ddr_rx_max_burstlen_c-1),burstlen_v'length) then
+            burstlen_v := to_unsigned((ddr_vector_width_c/2)*(ddr_rx_max_burstlen_c-1),burstlen_v'length);
+         end if;
+         temp_v := burstlen_v sll 1;
+      elsif unsigned(read_vector_in)=to_unsigned(3,ddr_vector_depth_c) then
+         if burstlen_v > to_unsigned((ddr_vector_width_c/4)*(ddr_rx_max_burstlen_c-1),burstlen_v'length) then
+            burstlen_v := to_unsigned((ddr_vector_width_c/4)*(ddr_rx_max_burstlen_c-1),burstlen_v'length);
+         end if;
+         temp_v := burstlen_v sll 2;
+      elsif unsigned(read_vector_in)=to_unsigned(7,ddr_vector_depth_c) then -- vsize=1
+         if burstlen_v > to_unsigned((ddr_vector_width_c/8)*(ddr_rx_max_burstlen_c-1),burstlen_v'length) then
+            burstlen_v := to_unsigned((ddr_vector_width_c/8)*(ddr_rx_max_burstlen_c-1),burstlen_v'length);
+         end if;
+         temp_v := burstlen_v sll 3;
+      else
+         if burstlen_v > to_unsigned(ddr_vector_width_c*(ddr_rx_max_burstlen_c-1),burstlen_v'length) then
+            burstlen_v := to_unsigned(ddr_vector_width_c*(ddr_rx_max_burstlen_c-1),burstlen_v'length);
+         end if;
+         temp_v := burstlen_v;
       end if;
-      temp_v := burstlen_v sll 1;
-   elsif unsigned(read_vector_in)=to_unsigned(3,ddr_vector_depth_c) then
-      if burstlen_v > to_unsigned((ddr_vector_width_c/4)*(ddr_max_burstlen_c-1),burstlen_v'length) then
-         burstlen_v := to_unsigned((ddr_vector_width_c/4)*(ddr_max_burstlen_c-1),burstlen_v'length);
-      end if;
-      temp_v := burstlen_v sll 2;
-   elsif unsigned(read_vector_in)=to_unsigned(7,ddr_vector_depth_c) then -- vsize=1
-      if burstlen_v > to_unsigned((ddr_vector_width_c/8)*(ddr_max_burstlen_c-1),burstlen_v'length) then
-         burstlen_v := to_unsigned((ddr_vector_width_c/8)*(ddr_max_burstlen_c-1),burstlen_v'length);
-      end if;
-      temp_v := burstlen_v sll 3;
    else
-      if burstlen_v > to_unsigned(ddr_vector_width_c*(ddr_max_burstlen_c-1),burstlen_v'length) then
-         burstlen_v := to_unsigned(ddr_vector_width_c*(ddr_max_burstlen_c-1),burstlen_v'length);
+      --------------
+      -- When address is non aligned with 64-bit boundary then dont use up to max burst length but 
+      -- one less since burst length will be incremented later by 1 due to address misalignment
+      -----------------
+
+      -- Calculate burst length for different vector format
+
+      if unsigned(read_vector_in)=to_unsigned(1,ddr_vector_depth_c) then 
+         if burstlen_v > to_unsigned((ddr_vector_width_c/2)*(ddr_rx_max_burstlen_c-2),burstlen_v'length) then
+            burstlen_v := to_unsigned((ddr_vector_width_c/2)*(ddr_rx_max_burstlen_c-2),burstlen_v'length);
+         end if;
+         temp_v := burstlen_v sll 1;
+      elsif unsigned(read_vector_in)=to_unsigned(3,ddr_vector_depth_c) then
+         if burstlen_v > to_unsigned((ddr_vector_width_c/4)*(ddr_rx_max_burstlen_c-2),burstlen_v'length) then
+            burstlen_v := to_unsigned((ddr_vector_width_c/4)*(ddr_rx_max_burstlen_c-2),burstlen_v'length);
+         end if;
+         temp_v := burstlen_v sll 2;
+      elsif unsigned(read_vector_in)=to_unsigned(7,ddr_vector_depth_c) then -- vsize=1
+         if burstlen_v > to_unsigned((ddr_vector_width_c/8)*(ddr_rx_max_burstlen_c-2),burstlen_v'length) then
+            burstlen_v := to_unsigned((ddr_vector_width_c/8)*(ddr_rx_max_burstlen_c-2),burstlen_v'length);
+         end if;
+         temp_v := burstlen_v sll 3;
+      else
+         if burstlen_v > to_unsigned(ddr_vector_width_c*(ddr_rx_max_burstlen_c-2),burstlen_v'length) then
+            burstlen_v := to_unsigned(ddr_vector_width_c*(ddr_rx_max_burstlen_c-2),burstlen_v'length);
+         end if;
+         temp_v := burstlen_v;
       end if;
-      temp_v := burstlen_v;
    end if;
+   --- Increase burst length if address is not aligned to 64-bit address boundary
    temp3_v := temp_v+addr_v+to_unsigned(ddr_vector_width_c-1,temp3_v'length);
    temp4_v := temp3_v srl ddr_vector_depth_c;
    read_burstlen3 <= resize(temp4_v,read_burstlen3'length);
@@ -549,6 +595,11 @@ begin
       end_of_word_v := '0';
    end if;
 
+   --------------------------
+   -- Determine if this burst partially fullfilled the next burst due to address
+   -- misalignment
+   ---------------------------
+
    if end_of_burst_v='0' then
       read_record_write(ddr_vector_depth_c) <= '0';
       read_piggyback <= '0';
@@ -584,7 +635,6 @@ begin
    read_record_write(pos_v+read_filler_data_in'length-1 downto pos_v) <= read_filler_data_in;
    pos_v := pos_v+read_filler_data_in'length;
    read_record_write_ena <= read2 and (not read_wait_request);
-
 end process;
 
 
@@ -691,7 +741,7 @@ else
        if rvalid='1' and ddr_rlast_in='1' then
           read_transaction_complete_r <= read_transaction_complete_r+to_unsigned(1,read_transaction_complete_r'length);
        end if;
-       if ((signed(read_request_r)-signed(read_complete_r)) >= to_signed(ddr_max_read_pend_c-ddr_max_burstlen_c-4,read_complete_r'length)) or
+       if ((signed(read_request_r)-signed(read_complete_r)) >= to_signed(ddr_max_read_pend_c-ddr_rx_max_burstlen_c-4,read_complete_r'length)) or
           ((signed(read_transaction_request_r)-signed(read_transaction_complete_r)) >= to_signed(ddr_max_read_transaction_pend_c-1,read_transaction_complete_r'length))
        then
           read_pending_full_r <= '1';

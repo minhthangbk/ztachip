@@ -30,11 +30,11 @@ use work.ztachip_pkg.all;
 
 entity axi_split_write is
    generic (
-      NUM_MASTER_PORT     : integer:=4;
-      NUM_MASTER_PORT_USED: integer:=4;
-      BAR_LO_BIT          : integer_array(3 downto 0);
-      BAR_HI_BIT          : integer_array(3 downto 0);
-      BAR                 : integer_array(3 downto 0)
+      NUM_MASTER_PORT     : integer:=5;
+      NUM_MASTER_PORT_USED: integer:=5;
+      BAR_LO_BIT          : integer_array(4 downto 0);
+      BAR_HI_BIT          : integer_array(4 downto 0);
+      BAR                 : integer_array(4 downto 0)
    );
    port 
    (
@@ -157,6 +157,7 @@ constant M0:integer:=0;
 constant M1:integer:=1;
 constant M2:integer:=2;
 constant M3:integer:=3;
+constant M4:integer:=4;
 
 begin
 
@@ -332,6 +333,12 @@ begin
          pending_write_rec(M3) <= '1';
          pending_write <= aximaster_awreadys_in(M3);
          axislave_awready <= aximaster_awreadys_in(M3);
+      elsif((M4 < NUM_MASTER_PORT_USED) and
+            awaddr(BAR_HI_BIT(M4) downto BAR_LO_BIT(M4))=std_logic_vector(to_unsigned(BAR(M4),BAR_HI_BIT(M4)-BAR_LO_BIT(M4)+1))) then
+         aximaster_awvalids(M4) <= '1';
+         pending_write_rec(M4) <= '1';
+         pending_write <= aximaster_awreadys_in(M4);
+         axislave_awready <= aximaster_awreadys_in(M4);
       end if;
    end if;
 
@@ -365,6 +372,12 @@ begin
       axislave_bvalid <= aximaster_bvalids_in(M3);
       axislave_bresp <= aximaster_bresps_in(M3);
       aximaster_breadys(M3) <= axislave_bready;
+   elsif((M4 < NUM_MASTER_PORT_USED) and
+         pending_resp_read_empty='0' and pending_resp_read_rec(M4)='1') then
+      axislave_bid <= aximaster_bids_in(M4);      
+      axislave_bvalid <= aximaster_bvalids_in(M4);
+      axislave_bresp <= aximaster_bresps_in(M4);
+      aximaster_breadys(M4) <= axislave_bready;
    end if;
 
    -- Route data transfer to correct masters
@@ -387,6 +400,10 @@ begin
          pending_data_read_empty='0' and pending_data_read_rec(M3)='1') then
       aximaster_wvalids(M3) <= axislave_wvalid_r;  
       axislave_wready <= aximaster_wreadys_in(M3);
+   elsif((M4 < NUM_MASTER_PORT_USED) and
+         pending_data_read_empty='0' and pending_data_read_rec(M4)='1') then
+      aximaster_wvalids(M4) <= axislave_wvalid_r;  
+      axislave_wready <= aximaster_wreadys_in(M4);
    end if;
 
    FOR I IN 0 TO NUM_MASTER_PORT-1 LOOP

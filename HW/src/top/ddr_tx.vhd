@@ -104,6 +104,8 @@ SIGNAL write_data_write_r:ddr_write_cmd_t;
 SIGNAL write_data_write:ddr_write_cmd_t;
 SIGNAL write_data_write_ena:STD_LOGIC;
 SIGNAL write_data_write_ena_r:STD_LOGIC;
+SIGNAL write_data_write_ena_rr:STD_LOGIC;
+SIGNAL write_data_write_ena_rrr:STD_LOGIC;
 SIGNAL write_burst_write_ena:std_logic;
 SIGNAL write_burst_write:std_logic_vector(burstlen_t'length+ddr_bus_width_c-1 downto 0);
 SIGNAL write_burst_read_ena:std_logic;
@@ -194,7 +196,7 @@ ddr_awsize_out <= "011";
 
 -- Condition to move to next transaction...
 
-ddr_tx_busy_out <= '0' when ((write_request_r=write_complete_r) and (write_data_write_ena_r='0')) else '0';
+ddr_tx_busy_out <= '0' when ((write_request_r=write_complete_r) and (write_data_write_ena_r='0') and (write_data_write_ena_rr='0') and (write_data_write_ena_rrr='0')) else '1';
 
 -- Would the current transmit request complete the current word.
 write_complete <= '1' when ((unsigned('0' & write_addr_in(ddr_vector_depth_c-1 downto 0))+unsigned('0' & write_vector_in)+to_unsigned(1,ddr_vector_depth_c+1))>=to_unsigned(ddr_vector_width_c,ddr_vector_depth_c+1))
@@ -276,6 +278,8 @@ process(reset_in,clock_in)
 begin
    if reset_in = '0' then
       write_data_write_ena_r <= '0';
+      write_data_write_ena_rr <= '0';
+      write_data_write_ena_rrr <= '0';
       write_next_addr_r <= (others=>'0');
       write_flush_r <= '0';
       write_complete_r <= (others=>'0');
@@ -285,6 +289,8 @@ begin
             -- Commit next transaction
             write_data_write_ena_r <= write_data_write_ena;
          end if;
+        write_data_write_ena_rr <= write_data_write_ena_r;
+        write_data_write_ena_rrr <= write_data_write_ena_rr;
          if write_data_write_ena='1' then
             if write_flush_r='0' then
                if write_burstlen_in=to_unsigned(1,burstlen_t'length) and write_over_complete='1' then

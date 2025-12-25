@@ -162,10 +162,17 @@ soc_base_inst: soc_base
       CAMERA_SDR=>open,
       CAMERA_RS=>'0',
       CAMERA_MCLK=>open,
-      CAMERA_PWDN=>open
+      CAMERA_PWDN=>open,
+
+      spi_ss=>open,
+      spi_sclk=>open,
+      spi_mosi=>open,
+      spi_cs_sd=>open,
+      spi_cs_esp32=>open,
+      spi_miso=>'0'
    );
 
-mem64_inst:mem64
+mem128_inst:mem128
    port map(   
       SDRAM_clk=>clk_main,
       SDRAM_reset=>reset,

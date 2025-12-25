@@ -337,11 +337,11 @@ int vision_ai() {
       // Check push button to see if it is time to switch demos
       buttonStatus=PushButtonGetState();
       if(!readyToSwitch) {
-         if(buttonStatus == 0)
+         if((buttonStatus&1) == 0)
             readyToSwitch=true;
       }
       if(!graphNN.IsRunning() && readyToSwitch) {
-         if(buttonStatus != 0) {
+         if((buttonStatus&1) != 0) {
             if(buttonStatus&1) {
                testcase=(TestCase)((int)testcase+1);
                if(testcase >= TestCaseMax)

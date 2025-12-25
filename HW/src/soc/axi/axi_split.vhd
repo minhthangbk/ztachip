@@ -30,12 +30,12 @@ use work.ztachip_pkg.all;
 
 entity axi_split is
    generic (
-      NUM_MASTER_PORT       : integer:=4;
-      NUM_MASTER_READ_PORT  : integer:=4;
-      NUM_MASTER_WRITE_PORT : integer:=4;
-      BAR_LO_BIT            : integer_array(3 downto 0);
-      BAR_HI_BIT            : integer_array(3 downto 0);
-      BAR                   : integer_array(3 downto 0)
+      NUM_MASTER_PORT       : integer:=5;
+      NUM_MASTER_READ_PORT  : integer:=5;
+      NUM_MASTER_WRITE_PORT : integer:=5;
+      BAR_LO_BIT            : integer_array(4 downto 0);
+      BAR_HI_BIT            : integer_array(4 downto 0);
+      BAR                   : integer_array(4 downto 0)
    );
    port 
    (
@@ -240,7 +240,47 @@ entity axi_split is
       aximaster3_awprot_out  : OUT axi_awprot_t;
       aximaster3_awqos_out   : OUT axi_awqos_t;
       aximaster3_awsize_out  : OUT axi_awsize_t;
-      aximaster3_bready_out  : OUT axi_bready_t
+      aximaster3_bready_out  : OUT axi_bready_t;
+
+      -- Master port #4
+      aximaster4_araddr_out  : OUT axi_araddr_t;
+      aximaster4_arlen_out   : OUT axi_arlen_t;
+      aximaster4_arvalid_out : OUT axi_arvalid_t;
+      aximaster4_arid_out    : OUT axi_arid_t;
+      aximaster4_arlock_out  : OUT axi_arlock_t;
+      aximaster4_arcache_out : OUT axi_arcache_t;
+      aximaster4_arprot_out  : OUT axi_arprot_t;
+      aximaster4_arqos_out   : OUT axi_arqos_t;
+      aximaster4_rid_in      : IN axi_rid_t:=(others=>'0');              
+      aximaster4_rvalid_in   : IN axi_rvalid_t:='0';
+      aximaster4_rlast_in    : IN axi_rlast_t:='0';
+      aximaster4_rdata_in    : IN axi_rdata_t:=(others=>'0');
+      aximaster4_rresp_in    : IN axi_rresp_t:=(others=>'0');
+      aximaster4_arready_in  : IN axi_arready_t:='0';
+      aximaster4_rready_out  : OUT axi_rready_t;
+      aximaster4_arburst_out : OUT axi_arburst_t;
+      aximaster4_arsize_out  : OUT axi_arsize_t;
+
+      aximaster4_awaddr_out  : OUT axi_awaddr_t;
+      aximaster4_awlen_out   : OUT axi_awlen_t;
+      aximaster4_awvalid_out : OUT axi_awvalid_t;
+      aximaster4_wvalid_out  : OUT axi_wvalid_t;
+      aximaster4_wdata_out   : OUT axi_wdata_t;
+      aximaster4_wlast_out   : OUT axi_wlast_t;
+      aximaster4_wstrb_out   : OUT axi_wstrb_t;
+      aximaster4_awready_in  : IN axi_awready_t:='0';
+      aximaster4_wready_in   : IN axi_wready_t:='0';
+      aximaster4_bresp_in    : IN axi_bresp_t:=(others=>'0');
+      aximaster4_bid_in      : IN axi_bid_t:=(others=>'0');
+      aximaster4_bvalid_in   : IN axi_bvalid_t:='0';
+      aximaster4_awburst_out : OUT axi_awburst_t;
+      aximaster4_awcache_out : OUT axi_awcache_t;
+      aximaster4_awid_out    : OUT axi_awid_t;
+      aximaster4_awlock_out  : OUT axi_awlock_t;
+      aximaster4_awprot_out  : OUT axi_awprot_t;
+      aximaster4_awqos_out   : OUT axi_awqos_t;
+      aximaster4_awsize_out  : OUT axi_awsize_t;
+      aximaster4_bready_out  : OUT axi_bready_t
    );
 end axi_split;
 
@@ -250,6 +290,7 @@ constant M0:integer:=0;
 constant M1:integer:=1;
 constant M2:integer:=2;
 constant M3:integer:=3;
+constant M4:integer:=4;
 
 SIGNAL aximaster_araddrs:axi_araddrs_t(NUM_MASTER_PORT-1 downto 0);
 SIGNAL aximaster_arlens:axi_arlens_t(NUM_MASTER_PORT-1 downto 0);
@@ -417,7 +458,25 @@ axi_split_read_i: axi_split_read
    aximaster_rlasts(M3) <= aximaster3_rlast_in;
    aximaster_rdatas(M3) <= aximaster3_rdata_in;
    aximaster_rresps(M3) <= aximaster3_rresp_in;
-   aximaster_arreadys(M3) <= aximaster3_arready_in;  
+   aximaster_arreadys(M3) <= aximaster3_arready_in;
+
+   aximaster4_araddr_out <= aximaster_araddrs(M4);
+   aximaster4_arlen_out <= aximaster_arlens(M4);
+   aximaster4_arvalid_out <= aximaster_arvalids(M4);   
+   aximaster4_arid_out <= aximaster_arids(M4);
+   aximaster4_arlock_out <= aximaster_arlocks(M4);
+   aximaster4_arcache_out <= aximaster_arcaches(M4);
+   aximaster4_arprot_out <= aximaster_arprots(M4);
+   aximaster4_arqos_out <= aximaster_arqoss(M4);
+   aximaster4_rready_out <= aximaster_rreadys(M4);
+   aximaster4_arburst_out <= aximaster_arbursts(M4);
+   aximaster4_arsize_out <= aximaster_arsizes(M4);
+   aximaster_rids(M4) <= aximaster4_rid_in;
+   aximaster_rvalids(M4) <= aximaster4_rvalid_in;
+   aximaster_rlasts(M4) <= aximaster4_rlast_in;
+   aximaster_rdatas(M4) <= aximaster4_rdata_in;
+   aximaster_rresps(M4) <= aximaster4_rresp_in;
+   aximaster_arreadys(M4) <= aximaster4_arready_in;  
 
 END GENERATE GEN1;
 
@@ -563,6 +622,27 @@ axi_split_write_i: axi_split_write
    aximaster_bresps(M3) <= aximaster3_bresp_in; 
    aximaster_bids(M3) <= aximaster3_bid_in; 
    aximaster_bvalids(M3) <= aximaster3_bvalid_in; 
+
+   aximaster4_awaddr_out <= aximaster_awaddrs(M4); 
+   aximaster4_awlen_out <= aximaster_awlens(M4);
+   aximaster4_awvalid_out <= aximaster_awvalids(M4);
+   aximaster4_wvalid_out <= aximaster_wvalids(M4);
+   aximaster4_wdata_out <= aximaster_wdatas(M4);
+   aximaster4_wlast_out <= aximaster_wlasts(M4);
+   aximaster4_wstrb_out <= aximaster_wstrbs(M4);
+   aximaster4_awburst_out <= aximaster_awbursts(M4);
+   aximaster4_awcache_out <= aximaster_awcaches(M4);
+   aximaster4_awid_out <= aximaster_awids(M4);
+   aximaster4_awlock_out <= aximaster_awlocks(M4);
+   aximaster4_awprot_out <= aximaster_awprots(M4);
+   aximaster4_awqos_out <= aximaster_awqoss(M4);
+   aximaster4_awsize_out <=aximaster_awsizes(M4);
+   aximaster4_bready_out <= aximaster_breadys(M4);
+   aximaster_awreadys(M4) <= aximaster4_awready_in; 
+   aximaster_wreadys(M4) <= aximaster4_wready_in; 
+   aximaster_bresps(M4) <= aximaster4_bresp_in; 
+   aximaster_bids(M4) <= aximaster4_bid_in; 
+   aximaster_bvalids(M4) <= aximaster4_bvalid_in; 
 
 END GENERATE GEN2;
 

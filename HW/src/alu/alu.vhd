@@ -27,25 +27,31 @@ LIBRARY ieee;
 USE ieee.std_logic_1164.all;
 use IEEE.numeric_std.all;
 use work.ztachip_pkg.all;
+use work.config.all;
 
 ENTITY alu IS
-    PORT
-    (
-        clock_in        : IN STD_LOGIC;
-        reset_in        : IN STD_LOGIC;    
-        mu_opcode_in    : IN mu_opcode_t;
-        mu_tid_in       : IN tid_t;
-        xreg_in         : IN STD_LOGIC_VECTOR(accumulator_width_c-1 downto 0);
-        x1_in           : IN STD_LOGIC_VECTOR (register_width_c-1 DOWNTO 0);
-        x2_in           : IN STD_LOGIC_VECTOR (register_width_c-1 DOWNTO 0);
-        x_scalar_in     : IN STD_LOGIC_VECTOR(register_width_c-1 DOWNTO 0);
-        y_out           : OUT STD_LOGIC_VECTOR (accumulator_width_c-1 DOWNTO 0);
-        y2_out          : OUT STD_LOGIC;
-        y3_out          : OUT STD_LOGIC_VECTOR (register_width_c-1 DOWNTO 0)
-    );
+   GENERIC(
+      INDEX:integer
+   );
+   PORT
+   (
+      clock_in        : IN STD_LOGIC;
+      reset_in        : IN STD_LOGIC;    
+      mu_opcode_in    : IN mu_opcode_t;
+      mu_tid_in       : IN tid_t;
+      xreg_in         : IN STD_LOGIC_VECTOR(accumulator_width_c-1 downto 0);
+      x1_in           : IN STD_LOGIC_VECTOR (register_width_c-1 DOWNTO 0);
+      x2_in           : IN STD_LOGIC_VECTOR (register_width_c-1 DOWNTO 0);
+      x_scalar_in     : IN STD_LOGIC_VECTOR(register_width_c-1 DOWNTO 0);
+      y_out           : OUT STD_LOGIC_VECTOR (accumulator_width_c-1 DOWNTO 0);
+      y2_out          : OUT STD_LOGIC;
+      y3_out          : OUT STD_LOGIC_VECTOR (register_width_c-1 DOWNTO 0)
+   );
 END alu;
 
 ARCHITECTURE behavior OF alu IS
+
+constant FP12_INT_WIDTH:integer:=18;
 
 SIGNAL add_sub:STD_LOGIC;
 SIGNAL add_sub_r:STD_LOGIC;
@@ -98,6 +104,8 @@ signal shift_direction_rrr:std_logic; -- 1 for right shift; 0 for left shift
 signal shift_direction_rrrr:std_logic; -- 1 for right shift; 0 for left shift
 signal y_mul_ext:std_logic_vector(accumulator_width_c-2*register_width_c-1 downto 0);
 signal add_x1:std_logic_vector(accumulator_width_c-1 downto 0);
+
+signal fp12_value:fp12_t;
 
 -------
 -- Perform capping if result is saturated
@@ -183,7 +191,17 @@ begin
       y_r <= y_shift_r;
    end if;
 
-   y3_r <= saturation(y_shift_r);
+   if(mu_opcode_rrrr=mu_opcode_conv_c) then
+      y3_r <= fp12_value;
+   elsif(mu_opcode_rrrr=mu_opcode_lsb4_c) then
+      y3_r(3 downto 0) <= y_shift_r(3 downto 0);
+      y3_r(y3_r'length-1 downto 4) <= (others=>y_shift_r(3));
+   elsif(mu_opcode_rrrr=mu_opcode_msb4_c) then
+      y3_r(3 downto 0) <= y_shift_r(7 downto 4);
+      y3_r(y3_r'length-1 downto 4) <= (others=>y_shift_r(7));
+   else
+      y3_r <= saturation(y_shift_r);
+   end if;
 
    end if;
    end if;
@@ -233,6 +251,27 @@ shifter_i : barrel_shifter_a
       data_out=>y_shift
    );
 
+-----
+-- Convert integer to FP12
+-----
+
+GEN1: IF(fpu_enabled_c = TRUE) GENERATE
+fp12_inst: fp12
+	generic map(
+		INT_WIDTH => FP12_INT_WIDTH -- This is enough for now to do LLM with 4-bit quantization
+		)
+	port map(
+      clock_in=>clock_in,
+      reset_in=>reset_in,
+      input_in=>xreg_r(FP12_INT_WIDTH-1 downto 0),
+      output_out=>fp12_value
+	);
+END GENERATE GEN1;
+
+GEN2: IF(fpu_enabled_c = FALSE) GENERATE
+fp12_value <= (others=>'0');
+END GENERATE GEN2;
+
 y_mul_ext <= (others=>y_mul(y_mul'length-1));
 
 add_x1 <= y_mul_ext & y_mul;
@@ -250,7 +289,9 @@ begin
       elsif mu_opcode_in=mu_opcode_assign_raw_c or
          mu_opcode_in=mu_opcode_assign_c or
          mu_opcode_in=mu_opcode_shla_c or
-         mu_opcode_in=mu_opcode_shra_c then
+         mu_opcode_in=mu_opcode_shra_c or 
+         mu_opcode_in=mu_opcode_lsb4_c or
+         mu_opcode_in=mu_opcode_msb4_c then
          mul_x2_r <= (others=>'0');
       else
          mul_x2_r <= std_logic_vector(to_unsigned(1,register_width_c));
@@ -344,7 +385,7 @@ begin
             xreg_rrrr <= xreg_rrr;
             xreg_rrr <= xreg_rr;
 
-            if mu_opcode_r(fm_oc_hi_c downto fm_oc_lo_c)=mu_opcode_fm_c(fm_oc_hi_c downto fm_oc_lo_c) then
+            if (mu_opcode_r(fm_oc_hi_c downto fm_oc_lo_c)=mu_opcode_fm_c(fm_oc_hi_c downto fm_oc_lo_c)) then
                xreg_rr <= xreg_r;
             else
                case mu_opcode_r is
@@ -352,7 +393,7 @@ begin
                      xreg_rr <= std_logic_vector(resize(signed(xreg_r),shift_width_c));
                   when mu_opcode_mul_c|mu_opcode_shl_c|mu_opcode_shr_c =>
                      xreg_rr <= (others=>'0');
-                  when mu_opcode_assign_raw_c|mu_opcode_assign_c=>
+                  when mu_opcode_assign_raw_c|mu_opcode_assign_c|mu_opcode_lsb4_c|mu_opcode_msb4_c=>
                      xreg_rr(register_width_c-1 downto 0) <= x1_r;
                      xreg_rr(accumulator_width_c-1 downto register_width_c) <= (others=>x1_r(register_width_c-1));
                   when others=>

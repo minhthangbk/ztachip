@@ -2,46 +2,7 @@ include ../../py/mkenv.mk
 
 CROSS = 1 
 
-ZTA_OBJS = $(ZTACHIP)/SW/build/base/newlib.o \
-	$(ZTACHIP)/SW/build/base/ztalib.o \
-	$(ZTACHIP)/SW/build/base/ztalog.o \
-	$(ZTACHIP)/SW/build/base/tensor.o \
-	$(ZTACHIP)/SW/build/base/util.o \
-	$(ZTACHIP)/SW/build/base/graph.o \
-	$(ZTACHIP)/SW/build/base/task.o \
-	$(ZTACHIP)/SW/build/apps/main/kernels/main.m.o \
-	$(ZTACHIP)/SW/build/apps/color/kernels/color.m.o \
-	$(ZTACHIP)/SW/build/apps/color/color.o \
-	$(ZTACHIP)/SW/build/apps/of/kernels/of.m.o \
-	$(ZTACHIP)/SW/build/apps/of/of.o \
-	$(ZTACHIP)/SW/build/apps/canny/kernels/canny.m.o \
-	$(ZTACHIP)/SW/build/apps/canny/canny.o \
-	$(ZTACHIP)/SW/build/apps/harris/kernels/harris.m.o \
-	$(ZTACHIP)/SW/build/apps/harris/harris.o \
-	$(ZTACHIP)/SW/build/apps/resize/kernels/resize.m.o \
-	$(ZTACHIP)/SW/build/apps/resize/resize.o \
-	$(ZTACHIP)/SW/build/apps/gaussian/kernels/gaussian.m.o \
-	$(ZTACHIP)/SW/build/apps/gaussian/gaussian.o \
-	$(ZTACHIP)/SW/build/apps/equalize/kernels/equalize.m.o \
-	$(ZTACHIP)/SW/build/apps/equalize/equalize.o \
-	$(ZTACHIP)/SW/build/apps/nn/nn_add.o \
-	$(ZTACHIP)/SW/build/apps/nn/nn_concat.o \
-	$(ZTACHIP)/SW/build/apps/nn/nn_conv2d.o \
-	$(ZTACHIP)/SW/build/apps/nn/nn.o \
-	$(ZTACHIP)/SW/build/apps/nn/nn_logistic.o \
-	$(ZTACHIP)/SW/build/apps/nn/nn_objdect.o \
-	$(ZTACHIP)/SW/build/apps/nn/nn_poolavg.o \
-	$(ZTACHIP)/SW/build/apps/nn/nn_reshape.o \
-	$(ZTACHIP)/SW/build/apps/nn/nn_util.o \
-	$(ZTACHIP)/SW/build/apps/nn/tf.o \
-	$(ZTACHIP)/SW/build/apps/nn/tf_util.o \
-	$(ZTACHIP)/SW/build/apps/nn/kernels/conv.m.o \
-	$(ZTACHIP)/SW/build/apps/nn/kernels/fcn.m.o \
-	$(ZTACHIP)/SW/build/apps/nn/kernels/objdet.m.o \
-	$(ZTACHIP)/SW/build/apps/test/kernels/test.m.o \
-	$(ZTACHIP)/SW/build/apps/gdi/gdi.o \
-	$(ZTACHIP)/SW/build/src/soc.o \
-	$(ZTACHIP)/SW/build/src/mpy.o
+ZTA_OBJS = 
 
 # qstr definitions (must come before including py.mk)
 QSTR_DEFS = qstrdefsport.h
@@ -121,7 +82,7 @@ $(BUILD)/_frozen_mpy.c: $(TOP)/tests/frozen/frozentest.mpy $(BUILD)/genhdr/qstrd
 
 $(BUILD)/firmware.elf: $(OBJ)
 	$(ECHO) "LINK $@"
-	$(Q)$(LD) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS) 
+	$(Q)$(LD) $(CFLAGS) -o $@ $^ $(ZTACHIP)/SW/build/libzta.a $(LDFLAGS) $(LIBS) 
 	$(Q)$(SIZE) $@
 
 $(BUILD)/firmware.bin: $(BUILD)/firmware.elf

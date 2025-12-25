@@ -41,10 +41,10 @@ entity axi_merge is
    port 
    (
       clock_in               : in std_logic;
+      ddr_clock_in           : in std_logic;
       reset_in               : in std_logic;
 
       -- wide slave port
-      axislavew_clock_in      : IN std_logic;
       axislavew_araddr_in     : IN axi_araddr_t;
       axislavew_arlen_in      : IN axi_arlen_t;
       axislavew_arvalid_in    : IN axi_arvalid_t;     
@@ -85,7 +85,6 @@ entity axi_merge is
       axislavew_bready_in     : IN axi_bready_t;
 
       -- Slave port #0
-      axislave0_clock_in      : IN std_logic;
       axislave0_araddr_in     : IN axi_araddr_t;
       axislave0_arlen_in      : IN axi_arlen_t;
       axislave0_arvalid_in    : IN axi_arvalid_t;     
@@ -126,7 +125,6 @@ entity axi_merge is
       axislave0_bready_in         : IN axi_bready_t;
 
       -- Slave port #1
-      axislave1_clock_in      : IN std_logic;
       axislave1_araddr_in     : IN axi_araddr_t;
       axislave1_arlen_in      : IN axi_arlen_t;
       axislave1_arvalid_in    : IN axi_arvalid_t;     
@@ -167,7 +165,6 @@ entity axi_merge is
       axislave1_bready_in         : IN axi_bready_t;
 
       -- Slave port #2
-      axislave2_clock_in      : IN std_logic;
       axislave2_araddr_in     : IN axi_araddr_t;
       axislave2_arlen_in      : IN axi_arlen_t;
       axislave2_arvalid_in    : IN axi_arvalid_t;     
@@ -208,46 +205,45 @@ entity axi_merge is
       axislave2_bready_in         : IN axi_bready_t;
                            
       -- Master port #0
-      aximaster_araddr_out    : OUT axi_araddr_t;
-      aximaster_arlen_out     : OUT axi_arlen_t;
-      aximaster_arvalid_out   : OUT axi_arvalid_t;
-      aximaster_arid_out      : OUT axi_arid_t;
-      aximaster_arlock_out    : OUT axi_arlock_t;
-      aximaster_arcache_out   : OUT axi_arcache_t;
-      aximaster_arprot_out    : OUT axi_arprot_t;
-      aximaster_arqos_out     : OUT axi_arqos_t;
-      aximaster_rid_in        : IN axi_rid_t;              
-      aximaster_rvalid_in     : IN axi_rvalid_t;
-      aximaster_rlast_in      : IN axi_rlast_t;
-      aximaster_rdata_in      : IN axi_rdata64_t;
-      aximaster_rdata_mask_out: OUT std_logic_vector(1 downto 0);
-      aximaster_rresp_in      : IN axi_rresp_t;
-      aximaster_arready_in    : IN axi_arready_t;
-      aximaster_rready_out    : OUT axi_rready_t;
-      aximaster_arburst_out   : OUT axi_arburst_t;
-      aximaster_arsize_out    : OUT axi_arsize_t;
+      ddr_araddr_out               : OUT axi_araddr_t;
+      ddr_arlen_out                : OUT axi_arlen_t;
+      ddr_arvalid_out              : OUT axi_arvalid_t;
+      ddr_arid_out                 : OUT axi_arid_t;
+      ddr_arlock_out               : OUT axi_arlock_t;
+      ddr_arcache_out              : OUT axi_arcache_t;
+      ddr_arprot_out               : OUT axi_arprot_t;
+      ddr_arqos_out                : OUT axi_arqos_t;
+      ddr_rid_in                   : IN axi_rid_t;              
+      ddr_rvalid_in                : IN axi_rvalid_t;
+      ddr_rlast_in                 : IN axi_rlast_t;
+      ddr_rdata_in                 : IN axi_rdata128_t;
+      ddr_rresp_in                 : IN axi_rresp_t;
+      ddr_arready_in               : IN axi_arready_t;
+      ddr_rready_out               : OUT axi_rready_t;
+      ddr_arburst_out              : OUT axi_arburst_t;
+      ddr_arsize_out               : OUT axi_arsize_t;
       
-      aximaster_awaddr_out         : OUT axi_awaddr_t;
-      aximaster_awlen_out          : OUT axi_awlen_t;
-      aximaster_awvalid_out        : OUT axi_awvalid_t;
-      aximaster_wvalid_out         : OUT axi_wvalid_t;
-      aximaster_wdata_out          : OUT axi_wdata64_t;
-      aximaster_wdata_mask_out     : OUT std_logic_vector(1 downto 0);
-      aximaster_wlast_out          : OUT axi_wlast_t;
-      aximaster_wstrb_out          : OUT axi_wstrb8_t;
-      aximaster_awready_in         : IN axi_awready_t;
-      aximaster_wready_in          : IN axi_wready_t;
-      aximaster_bresp_in           : IN axi_bresp_t;
-      aximaster_bid_in             : IN axi_bid_t;
-      aximaster_bvalid_in          : IN axi_bvalid_t;
-      aximaster_awburst_out        : OUT axi_awburst_t;
-      aximaster_awcache_out        : OUT axi_awcache_t;
-      aximaster_awid_out           : OUT axi_awid_t;
-      aximaster_awlock_out         : OUT axi_awlock_t;
-      aximaster_awprot_out         : OUT axi_awprot_t;
-      aximaster_awqos_out          : OUT axi_awqos_t;
-      aximaster_awsize_out         : OUT axi_awsize_t;
-      aximaster_bready_out         : OUT axi_bready_t
+      ddr_awaddr_out               : OUT axi_awaddr_t;
+      ddr_awlen_out                : OUT axi_awlen_t;
+      ddr_awvalid_out              : OUT axi_awvalid_t;
+      ddr_wvalid_out               : OUT axi_wvalid_t;
+      ddr_wdata_out                : OUT axi_wdata128_t;
+      ddr_wdata_mask_out           : OUT std_logic_vector(1 downto 0);
+      ddr_wlast_out                : OUT axi_wlast_t;
+      ddr_wstrb_out                : OUT axi_wstrb16_t;
+      ddr_awready_in               : IN axi_awready_t;
+      ddr_wready_in                : IN axi_wready_t;
+      ddr_bresp_in                 : IN axi_bresp_t;
+      ddr_bid_in                   : IN axi_bid_t;
+      ddr_bvalid_in                : IN axi_bvalid_t;
+      ddr_awburst_out              : OUT axi_awburst_t;
+      ddr_awcache_out              : OUT axi_awcache_t;
+      ddr_awid_out                 : OUT axi_awid_t;
+      ddr_awlock_out               : OUT axi_awlock_t;
+      ddr_awprot_out               : OUT axi_awprot_t;
+      ddr_awqos_out                : OUT axi_awqos_t;
+      ddr_awsize_out               : OUT axi_awsize_t;
+      ddr_bready_out               : OUT axi_bready_t
    );
 end axi_merge;
 
@@ -255,7 +251,46 @@ architecture rtl of axi_merge is
 
 constant MAX_SLAVE_PORT:integer:=3;
 
-SIGNAL axislave_clocks:std_logic_vector(MAX_SLAVE_PORT-1 downto 0);
+SIGNAL ddr_araddr:axi_araddr_t;
+SIGNAL ddr_arlen:axi_arlen_t;
+SIGNAL ddr_arvalid:axi_arvalid_t;
+SIGNAL ddr_arid:axi_arid_t;
+SIGNAL ddr_arlock:axi_arlock_t;
+SIGNAL ddr_arcache:axi_arcache_t;
+SIGNAL ddr_arprot:axi_arprot_t;
+SIGNAL ddr_arqos:axi_arqos_t;
+SIGNAL ddr_rid:axi_rid_t;              
+SIGNAL ddr_rvalid:axi_rvalid_t;
+SIGNAL ddr_rlast:axi_rlast_t;
+SIGNAL ddr_rdata:axi_rdata128_t;
+SIGNAL ddr_rresp:axi_rresp_t;
+SIGNAL ddr_arready:axi_arready_t;
+SIGNAL ddr_rready:axi_rready_t;
+SIGNAL ddr_arburst:axi_arburst_t;
+SIGNAL ddr_arsize:axi_arsize_t;
+
+SIGNAL ddr_awaddr:axi_awaddr_t;
+SIGNAL ddr_awlen:axi_awlen_t;
+SIGNAL ddr_awvalid:axi_awvalid_t;
+SIGNAL ddr_wvalid:axi_wvalid_t;
+SIGNAL ddr_wdata:axi_wdata128_t;
+SIGNAL ddr_wdata_mask:std_logic_vector(1 downto 0);
+SIGNAL ddr_wlast:axi_wlast_t;
+SIGNAL ddr_wstrb:axi_wstrb16_t;
+SIGNAL ddr_awready:axi_awready_t;
+SIGNAL ddr_wready:axi_wready_t;
+SIGNAL ddr_bresp:axi_bresp_t;
+SIGNAL ddr_bid:axi_bid_t;
+SIGNAL ddr_bvalid:axi_bvalid_t;
+SIGNAL ddr_awburst:axi_awburst_t;
+SIGNAL ddr_awcache:axi_awcache_t;
+SIGNAL ddr_awid:axi_awid_t;
+SIGNAL ddr_awlock:axi_awlock_t;
+SIGNAL ddr_awprot:axi_awprot_t;
+SIGNAL ddr_awqos:axi_awqos_t;
+SIGNAL ddr_awsize:axi_awsize_t;
+SIGNAL ddr_bready:axi_bready_t;
+
 SIGNAL axislave_araddrs:axi_araddrs_t(MAX_SLAVE_PORT-1 downto 0);
 SIGNAL axislave_arlens:axi_arlens_t(MAX_SLAVE_PORT-1 downto 0);
 SIGNAL axislave_arvalids:axi_arvalids_t(MAX_SLAVE_PORT-1 downto 0);     
@@ -271,7 +306,7 @@ SIGNAL axislave_arsizes:axi_arsizes_t(MAX_SLAVE_PORT-1 downto 0);
 
 SIGNAL aximaster_rvalid:axi_rvalid_t;
 SIGNAL aximaster_rlast:axi_rlast_t;
-SIGNAL aximaster_rdata:axi_rdata64_t;
+SIGNAL aximaster_rdata:axi_rdata128_t;
 SIGNAL aximaster_rresp:axi_rresp_t;
 SIGNAL aximaster_arready:axi_arready_t;
 
@@ -293,7 +328,6 @@ SIGNAL aximaster_rid:axi_rid_t;
 SIGNAL aximaster_rready:axi_rready_t;
 SIGNAL aximaster_arburst:axi_arburst_t;
 SIGNAL aximaster_arsize:axi_arsize_t;
-SIGNAL aximaster_rdata_mask:std_logic_vector(1 downto 0);
 
 SIGNAL axislave_awaddrs:axi_awaddrs_t(MAX_SLAVE_PORT-1 downto 0);
 SIGNAL axislave_awlens:axi_awlens_t(MAX_SLAVE_PORT-1 downto 0);
@@ -318,6 +352,123 @@ SIGNAL axislave_breadys:axi_breadys_t(MAX_SLAVE_PORT-1 downto 0);
 
 begin
 
+----
+-- Clock domain crossing between DDR and main clock domain
+---
+
+read_i: axi_read
+   generic map(
+      DATA_WIDTH=>128,
+      FIFO_DEPTH => 5,
+      FIFO_DATA_DEPTH => 5,
+      CCD =>TRUE
+   )
+   port map
+   (
+      clock_in => ddr_clock_in,
+      reset_in => reset_in,
+
+      axislave_clock_in => clock_in,
+      axislave_araddr_in => ddr_araddr,
+      axislave_arlen_in => ddr_arlen,
+      axislave_arvalid_in => ddr_arvalid,
+      axislave_arid_in => ddr_arid,
+      axislave_arlock_in => ddr_arlock,
+      axislave_arcache_in => ddr_arcache,
+      axislave_arprot_in => ddr_arprot,
+      axislave_arqos_in => ddr_arqos,
+      axislave_rid_out => ddr_rid,   
+      axislave_rvalid_out => ddr_rvalid,
+      axislave_rlast_out => ddr_rlast,
+      axislave_rdata_out => ddr_rdata,
+      axislave_rresp_out => ddr_rresp,
+      axislave_arready_out => ddr_arready,
+      axislave_rready_in => ddr_rready,
+      axislave_arburst_in => ddr_arburst,
+      axislave_arsize_in => ddr_arsize,
+
+      -- Master port #1
+      aximaster_clock_in => ddr_clock_in,
+      aximaster_araddr_out => ddr_araddr_out,
+      aximaster_arlen_out => ddr_arlen_out,
+      aximaster_arvalid_out => ddr_arvalid_out,
+      aximaster_arid_out => ddr_arid_out,
+      aximaster_arlock_out => ddr_arlock_out,
+      aximaster_arcache_out => ddr_arcache_out,
+      aximaster_arprot_out => ddr_arprot_out,
+      aximaster_arqos_out => ddr_arqos_out,
+      aximaster_rid_in  => ddr_rid_in,
+      aximaster_rvalid_in => ddr_rvalid_in,
+      aximaster_rlast_in => ddr_rlast_in,
+      aximaster_rdata_in => ddr_rdata_in,
+      aximaster_rresp_in => ddr_rresp_in,
+      aximaster_arready_in => ddr_arready_in,
+      aximaster_rready_out => ddr_rready_out,
+      aximaster_arburst_out => ddr_arburst_out,
+      aximaster_arsize_out => ddr_arsize_out
+   );
+
+
+write_i: axi_write
+   generic map (
+      DATA_WIDTH => 128,
+      FIFO_DEPTH => 5,
+      FIFO_DATA_DEPTH => 5,
+      CCD => TRUE
+   )
+   port map 
+   (
+      clock_in => ddr_clock_in,
+      reset_in => reset_in,
+
+      -- Slace port
+      axislave_clock_in => clock_in,
+      axislave_awaddr_in => ddr_awaddr,
+      axislave_awlen_in => ddr_awlen,
+      axislave_awvalid_in => ddr_awvalid,
+      axislave_wvalid_in => ddr_wvalid,
+      axislave_wdata_in => ddr_wdata,
+      axislave_wlast_in => ddr_wlast,
+      axislave_wstrb_in => ddr_wstrb,
+      axislave_awready_out => ddr_awready,
+      axislave_wready_out => ddr_wready,
+      axislave_bresp_out => ddr_bresp,
+      axislave_bid_out => ddr_bid,
+      axislave_bvalid_out => ddr_bvalid,
+      axislave_awburst_in => ddr_awburst,
+      axislave_awcache_in => ddr_awcache,
+      axislave_awid_in => ddr_awid,
+      axislave_awlock_in => ddr_awlock,
+      axislave_awprot_in => ddr_awprot,
+      axislave_awqos_in => ddr_awqos,
+      axislave_awsize_in => ddr_awsize,
+      axislave_bready_in => ddr_bready,
+      
+      -- Master port #1
+      aximaster_clock_in => ddr_clock_in,
+      aximaster_awaddr_out => ddr_awaddr_out,
+      aximaster_awlen_out => ddr_awlen_out,
+      aximaster_awvalid_out => ddr_awvalid_out,
+      aximaster_wvalid_out => ddr_wvalid_out,
+      aximaster_wdata_out => ddr_wdata_out,
+      aximaster_wlast_out => ddr_wlast_out,
+      aximaster_wstrb_out => ddr_wstrb_out,
+      aximaster_awready_in => ddr_awready_in,
+      aximaster_wready_in => ddr_wready_in,
+      aximaster_bresp_in => ddr_bresp_in,
+      aximaster_bid_in => ddr_bid_in,
+      aximaster_bvalid_in => ddr_bvalid_in,
+      aximaster_awburst_out => ddr_awburst_out,
+      aximaster_awcache_out => ddr_awcache_out,
+      aximaster_awid_out => ddr_awid_out,
+      aximaster_awlock_out => ddr_awlock_out,
+      aximaster_awprot_out => ddr_awprot_out,
+      aximaster_awqos_out => ddr_awqos_out,
+      aximaster_awsize_out => ddr_awsize_out,
+      aximaster_bready_out => ddr_bready_out
+   );
+
+
 axislave0_rvalid_out <= axislave_rvalids(0);
 axislave0_rid_out <= axislave_rids(0);
 axislave0_rlast_out <= axislave_rlasts(0);
@@ -339,20 +490,18 @@ axislave2_rdata_out <= axislave_rdatas(2)(31 downto 0);
 axislave2_rresp_out <= axislave_rresps(2);
 axislave2_arready_out <= axislave_arreadys(2);
 
-aximaster_araddr_out <= aximaster_araddr;
-aximaster_arlen_out <= aximaster_arlen;
-aximaster_arvalid_out <= aximaster_arvalid;
-aximaster_arid_out <= aximaster_arid;
-aximaster_arlock_out <= aximaster_arlock;
-aximaster_arcache_out <= aximaster_arcache;
-aximaster_arprot_out <= aximaster_arprot;
-aximaster_arqos_out <= aximaster_arqos;              
-aximaster_rready_out <= aximaster_rready;
-aximaster_arburst_out <= aximaster_arburst;
-aximaster_arsize_out <= aximaster_arsize;
-aximaster_rdata_mask_out <= aximaster_rdata_mask;
+ddr_araddr <= aximaster_araddr;
+ddr_arlen <= aximaster_arlen;
+ddr_arvalid <= aximaster_arvalid;
+ddr_arid <= aximaster_arid;
+ddr_arlock <= aximaster_arlock;
+ddr_arcache <= aximaster_arcache;
+ddr_arprot <= aximaster_arprot;
+ddr_arqos <= aximaster_arqos;              
+ddr_rready <= aximaster_rready;
+ddr_arburst <= aximaster_arburst;
+ddr_arsize <= aximaster_arsize;
 
-axislave_clocks(0) <= axislave0_clock_in;
 axislave_araddrs(0) <= axislave0_araddr_in;
 axislave_arlens(0) <= axislave0_arlen_in;
 axislave_arvalids(0) <= axislave0_arvalid_in;    
@@ -365,7 +514,6 @@ axislave_rreadys(0) <= axislave0_rready_in;
 axislave_arbursts(0) <= axislave0_arburst_in;
 axislave_arsizes(0) <= axislave0_arsize_in;
 
-axislave_clocks(1) <= axislave1_clock_in;
 axislave_araddrs(1) <= axislave1_araddr_in;
 axislave_arlens(1) <= axislave1_arlen_in;
 axislave_arvalids(1) <= axislave1_arvalid_in;    
@@ -378,7 +526,6 @@ axislave_rreadys(1) <= axislave1_rready_in;
 axislave_arbursts(1) <= axislave1_arburst_in;
 axislave_arsizes(1) <= axislave1_arsize_in;
 
-axislave_clocks(2) <= axislave2_clock_in;
 axislave_araddrs(2) <= axislave2_araddr_in;
 axislave_arlens(2) <= axislave2_arlen_in;
 axislave_arvalids(2) <= axislave2_arvalid_in;    
@@ -391,12 +538,12 @@ axislave_rreadys(2) <= axislave2_rready_in;
 axislave_arbursts(2) <= axislave2_arburst_in;
 axislave_arsizes(2) <= axislave2_arsize_in;
 
-aximaster_rvalid <= aximaster_rvalid_in;
-aximaster_rid <= aximaster_rid_in;
-aximaster_rlast <= aximaster_rlast_in;
-aximaster_rdata <= aximaster_rdata_in;
-aximaster_rresp <= aximaster_rresp_in;
-aximaster_arready <= aximaster_arready_in;
+aximaster_rvalid <= ddr_rvalid;
+aximaster_rid <= ddr_rid;
+aximaster_rlast <= ddr_rlast;
+aximaster_rdata <= ddr_rdata;
+aximaster_rresp <= ddr_rresp;
+aximaster_arready <= ddr_arready;
 
 axislave_awaddrs(0) <= axislave0_awaddr_in;
 axislave_awlens(0) <= axislave0_awlen_in;
@@ -482,7 +629,6 @@ axi_merge_read_i: axi_merge_read
       reset_in=>reset_in,
 
       -- wide slave port
-      axislavew_clock_in=>axislavew_clock_in,
       axislavew_araddr_in=>axislavew_araddr_in,
       axislavew_arlen_in=>axislavew_arlen_in,
       axislavew_arvalid_in=>axislavew_arvalid_in,   
@@ -502,7 +648,6 @@ axi_merge_read_i: axi_merge_read
       axislavew_arsize_in=>axislavew_arsize_in,
       
       -- Slace port
-      axislave_clocks_in=>axislave_clocks,
       axislave_araddrs_in=>axislave_araddrs,
       axislave_arlens_in =>axislave_arlens,
       axislave_arvalids_in=>axislave_arvalids,
@@ -535,7 +680,6 @@ axi_merge_read_i: axi_merge_read
       aximaster_rvalid_in =>aximaster_rvalid,
       aximaster_rlast_in=>aximaster_rlast,
       aximaster_rdata_in =>aximaster_rdata,
-      aximaster_rdata_mask_out=>aximaster_rdata_mask,
 
       aximaster_arready_in =>aximaster_arready,
       aximaster_rready_out=>aximaster_rready, 
@@ -557,7 +701,6 @@ axi_merge_write_i:axi_merge_write
       clock_in=>clock_in,
       reset_in=>reset_in,
       
-      axislavew_clock_in=>axislavew_clock_in,
       axislavew_awaddr_in=>axislavew_awaddr_in,
       axislavew_awlen_in=>axislavew_awlen_in,
       axislavew_awvalid_in=>axislavew_awvalid_in,
@@ -579,7 +722,6 @@ axi_merge_write_i:axi_merge_write
       axislavew_awsize_in=>axislavew_awsize_in,
       axislavew_bready_in=>axislavew_bready_in,
 
-      axislave_clocks_in =>axislave_clocks,
       axislave_awaddrs_in=>axislave_awaddrs,
       axislave_awlens_in =>axislave_awlens,
       axislave_awvalids_in =>axislave_awvalids,
@@ -601,26 +743,26 @@ axi_merge_write_i:axi_merge_write
       axislave_awsizes_in=>axislave_awsizes,
       axislave_breadys_in=>axislave_breadys,
       
-      aximaster_awaddr_out=>aximaster_awaddr_out,
-      aximaster_awlen_out=>aximaster_awlen_out,
-      aximaster_awvalid_out=>aximaster_awvalid_out,
-      aximaster_wvalid_out=>aximaster_wvalid_out,
-      aximaster_wdata_out=>aximaster_wdata_out,
-      aximaster_wdata_mask_out=>aximaster_wdata_mask_out,
-      aximaster_wlast_out=>aximaster_wlast_out,
-      aximaster_wstrb_out=>aximaster_wstrb_out,
-      aximaster_awready_in=>aximaster_awready_in,
-      aximaster_wready_in=>aximaster_wready_in,
-      aximaster_bresp_in =>aximaster_bresp_in,
-      aximaster_bid_in =>aximaster_bid_in,
-      aximaster_bvalid_in=>aximaster_bvalid_in,
-      aximaster_awburst_out=>aximaster_awburst_out,
-      aximaster_awcache_out=>aximaster_awcache_out,
-      aximaster_awid_out=>aximaster_awid_out,
-      aximaster_awlock_out=>aximaster_awlock_out,
-      aximaster_awprot_out=>aximaster_awprot_out,
-      aximaster_awqos_out=>aximaster_awqos_out,
-      aximaster_awsize_out=>aximaster_awsize_out,
-      aximaster_bready_out=>aximaster_bready_out
+      aximaster_awaddr_out=>ddr_awaddr,
+      aximaster_awlen_out=>ddr_awlen,
+      aximaster_awvalid_out=>ddr_awvalid,
+      aximaster_wvalid_out=>ddr_wvalid,
+      aximaster_wdata_out=>ddr_wdata,
+      aximaster_wdata_mask_out=>ddr_wdata_mask,
+      aximaster_wlast_out=>ddr_wlast,
+      aximaster_wstrb_out=>ddr_wstrb,
+      aximaster_awready_in=>ddr_awready,
+      aximaster_wready_in=>ddr_wready,
+      aximaster_bresp_in =>ddr_bresp,
+      aximaster_bid_in =>ddr_bid,
+      aximaster_bvalid_in=>ddr_bvalid,
+      aximaster_awburst_out=>ddr_awburst,
+      aximaster_awcache_out=>ddr_awcache,
+      aximaster_awid_out=>ddr_awid,
+      aximaster_awlock_out=>ddr_awlock,
+      aximaster_awprot_out=>ddr_awprot,
+      aximaster_awqos_out=>ddr_awqos,
+      aximaster_awsize_out=>ddr_awsize,
+      aximaster_bready_out=>ddr_bready
    );
 end rtl;

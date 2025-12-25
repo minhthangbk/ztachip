@@ -110,7 +110,16 @@ entity soc_base is
    SIGNAL CAMERA_SDR   :OUT STD_LOGIC;
    SIGNAL CAMERA_RS    :IN STD_LOGIC;
    SIGNAL CAMERA_MCLK  :OUT STD_LOGIC;
-   SIGNAL CAMERA_PWDN  :OUT STD_LOGIC
+   SIGNAL CAMERA_PWDN  :OUT STD_LOGIC;
+
+   -- SPI signals
+   
+   SIGNAL spi_ss       :OUT STD_LOGIC;
+   SIGNAL spi_sclk     :OUT STD_LOGIC;
+   SIGNAL spi_mosi     :OUT STD_LOGIC;
+   SIGNAL spi_cs_sd    :OUT STD_LOGIC;
+   SIGNAL spi_cs_esp32 :OUT STD_LOGIC;
+   SIGNAL spi_miso     :IN STD_LOGIC
    );
 end soc_base;
    
@@ -238,6 +247,24 @@ architecture rtl of soc_base is
    SIGNAL dbus2_rlast:STD_LOGIC;
    SIGNAL dbus2_rvalid:STD_LOGIC;
    SIGNAL dbus2_rid:STD_LOGIC_VECTOR(0 downto 0);
+
+   SIGNAL sram_araddr:STD_LOGIC_VECTOR(31 downto 0);
+   SIGNAL sram_arlen:STD_LOGIC_VECTOR(7 downto 0);
+   SIGNAL sram_arsize:STD_LOGIC_VECTOR(2 downto 0);
+   SIGNAL sram_arburst:STD_LOGIC_VECTOR(1 downto 0);
+   SIGNAL sram_arvalid:STD_LOGIC;
+   SIGNAL sram_arready:STD_LOGIC;
+   SIGNAL sram_arid:STD_LOGIC_VECTOR(0 downto 0);
+   SIGNAL sram_arlock:STD_LOGIC_VECTOR(0 downto 0);
+   SIGNAL sram_arcache:STD_LOGIC_VECTOR(3 downto 0);
+   SIGNAL sram_arprot:STD_LOGIC_VECTOR(2 downto 0);
+   SIGNAL sram_arqos:STD_LOGIC_VECTOR(3 downto 0);
+   SIGNAL sram_rready:STD_LOGIC;
+   SIGNAL sram_rdata:STD_LOGIC_VECTOR(31 downto 0);
+   SIGNAL sram_rresp:STD_LOGIC_VECTOR(1 downto 0);
+   SIGNAL sram_rlast:STD_LOGIC;
+   SIGNAL sram_rvalid:STD_LOGIC;
+   SIGNAL sram_rid:STD_LOGIC_VECTOR(0 downto 0);
 
    SIGNAL apb_awaddr:STD_LOGIC_VECTOR(31 downto 0);
    SIGNAL apb_awlen:STD_LOGIC_VECTOR(7 downto 0);
@@ -464,8 +491,8 @@ architecture rtl of soc_base is
    SIGNAL s_rdata:STD_LOGIC_VECTOR(31 downto 0);
    SIGNAL s_rready:STD_LOGIC;
    SIGNAL s_rvalid:STD_LOGIC;
-   SIGNAL arlen:unsigned(2 downto 0);
-   SIGNAL awlen:unsigned(2 downto 0);
+   SIGNAL arlen:unsigned(ddr_burstlen_width_c-1 downto 0);
+   SIGNAL awlen:unsigned(ddr_burstlen_width_c-1 downto 0);
       
    -- SDRAM signals
    SIGNAL SDRAM_araddr2:STD_LOGIC_VECTOR(31 downto 0);
@@ -483,17 +510,16 @@ architecture rtl of soc_base is
    SIGNAL SDRAM_bready2:STD_LOGIC;
    SIGNAL SDRAM_bresp2:STD_LOGIC_VECTOR(1 downto 0);
    SIGNAL SDRAM_bvalid2:STD_LOGIC;
-   SIGNAL SDRAM_rdata2:STD_LOGIC_VECTOR(63 downto 0);
-   SIGNAL SDRAM_rdata_mask2:STD_LOGIC_VECTOR(1 downto 0);
+   SIGNAL SDRAM_rdata2:STD_LOGIC_VECTOR(127 downto 0);
    SIGNAL SDRAM_rlast2:STD_LOGIC;
    SIGNAL SDRAM_rready2:STD_LOGIC;
    SIGNAL SDRAM_rresp2:STD_LOGIC_VECTOR(1 downto 0);
    SIGNAL SDRAM_rvalid2:STD_LOGIC;
-   SIGNAL SDRAM_wdata2:STD_LOGIC_VECTOR(63 downto 0);
+   SIGNAL SDRAM_wdata2:STD_LOGIC_VECTOR(127 downto 0);
    SIGNAL SDRAM_wdata_mask2:STD_LOGIC_VECTOR(1 downto 0);
    SIGNAL SDRAM_wlast2:STD_LOGIC;
    SIGNAL SDRAM_wready2:STD_LOGIC;
-   SIGNAL SDRAM_wstrb2:STD_LOGIC_VECTOR(7 downto 0);
+   SIGNAL SDRAM_wstrb2:STD_LOGIC_VECTOR(15 downto 0);
    SIGNAL SDRAM_wvalid2:STD_LOGIC;
 
    SIGNAL VIDEO_tdata:STD_LOGIC_VECTOR(31 downto 0);
@@ -506,18 +532,38 @@ architecture rtl of soc_base is
    SIGNAL camera_tready:STD_LOGIC;
    SIGNAL camera_tvalid:STD_LOGIC;
 
+   SIGNAL ogpio:STD_LOGIC_VECTOR(15 downto 0);
+   SIGNAL igpio:STD_LOGIC_VECTOR(15 downto 0);
+
    constant TCM_DEPTH : integer:=14; -- TCM size=2**TCM_DEPTH bytes
 
 begin
 
    resetn <= not clk_reset;  
    
+   led <= ogpio(3 downto 0);
+
+   spi_ss <= ogpio(4);
+
+   spi_sclk <= ogpio(5);
+
+   spi_mosi <= ogpio(6);
+
+   spi_cs_sd <= ogpio(7);
+
+   spi_cs_esp32 <= ogpio(8);
+
+   igpio(3 downto 0) <= pushbutton;
+
+   igpio(4) <= spi_miso;
+
+   igpio(7 downto 5) <= (others=>'0');
+
    ZTA_CONTROL_rlast <= '1';
 
    ZTA_CONTROL_rid <= (others=>'0');
    
    ZTA_CONTROL_bid <= (others=>'0');
-
 
    -- -----------------------------
    -- CPU. RISCV based on VexRiscv
@@ -592,12 +638,12 @@ begin
 
 axi_split_ibus_i : axi_split
    GENERIC MAP (
-      NUM_MASTER_PORT=>4,
+      NUM_MASTER_PORT=>5,
       NUM_MASTER_READ_PORT=>2,
       NUM_MASTER_WRITE_PORT=>0,
-      BAR_LO_BIT=>(0,0,31,TCM_DEPTH),
-      BAR_HI_BIT=>(0,0,31,31),
-      BAR=>(0,0,0,0)
+      BAR_LO_BIT=>(0,0,0,31,TCM_DEPTH),
+      BAR_HI_BIT=>(0,0,0,31,31),
+      BAR=>(0,0,0,0,0)
    )
    PORT MAP
    (
@@ -661,12 +707,12 @@ axi_split_ibus_i : axi_split
 
 axi_split_dbus_i : axi_split
    GENERIC MAP (
-      NUM_MASTER_PORT=>4,
-      NUM_MASTER_READ_PORT=>4,
-      NUM_MASTER_WRITE_PORT=>4,
-      BAR_LO_BIT=>(30,30,30,TCM_DEPTH),
-      BAR_HI_BIT=>(31,31,31,31),
-      BAR=>(0,2,3,0)
+      NUM_MASTER_PORT=>5,
+      NUM_MASTER_READ_PORT=>5,
+      NUM_MASTER_WRITE_PORT=>5,
+      BAR_LO_BIT=>(30,30,30,30,TCM_DEPTH),
+      BAR_HI_BIT=>(31,31,31,31,31),
+      BAR=>(1,0,2,3,0)
    )
    PORT MAP
    (
@@ -866,7 +912,46 @@ axi_split_dbus_i : axi_split
       aximaster0_awprot_out=>open,
       aximaster0_awqos_out=>open,
       aximaster0_awsize_out=>TCM_awsize,
-      aximaster0_bready_out=>TCM_bready    
+      aximaster0_bready_out=>TCM_bready,
+
+      aximaster4_araddr_out=>sram_araddr,
+      aximaster4_arlen_out=>sram_arlen,
+      aximaster4_arvalid_out=>sram_arvalid,
+      aximaster4_arid_out=>sram_arid,
+      aximaster4_arlock_out=>sram_arlock,
+      aximaster4_arcache_out=>sram_arcache,
+      aximaster4_arprot_out=>sram_arprot,
+      aximaster4_arqos_out=>sram_arqos,
+      aximaster4_rid_in=>sram_rid,
+      aximaster4_rvalid_in=>sram_rvalid,
+      aximaster4_rlast_in=>sram_rlast,
+      aximaster4_rdata_in=>sram_rdata,
+      aximaster4_rresp_in=>sram_rresp,
+      aximaster4_arready_in=>sram_arready,
+      aximaster4_rready_out=>sram_rready,
+      aximaster4_arburst_out=>sram_arburst,
+      aximaster4_arsize_out=>sram_arsize,
+
+      aximaster4_awaddr_out=>open,
+      aximaster4_awlen_out=>open,
+      aximaster4_awvalid_out=>open,
+      aximaster4_wvalid_out=>open,
+      aximaster4_wdata_out=>open,
+      aximaster4_wlast_out=>open,
+      aximaster4_wstrb_out=>open,
+      aximaster4_awready_in=>'0',
+      aximaster4_wready_in=>'0',
+      aximaster4_bresp_in=>(others=>'0'),
+      aximaster4_bid_in=>(others=>'0'),
+      aximaster4_bvalid_in=>'0',
+      aximaster4_awburst_out=>open,
+      aximaster4_awcache_out=>open,
+      aximaster4_awid_out=>open,
+      aximaster4_awlock_out=>open,
+      aximaster4_awprot_out=>open,
+      aximaster4_awqos_out=>open,
+      aximaster4_awsize_out=>open,
+      aximaster4_bready_out=>open
    );
 
 axi_merge_inst : axi_merge 
@@ -882,10 +967,10 @@ axi_merge_inst : axi_merge
       W_FIFO_W_DATA_DEPTH=>8
    )
    PORT MAP (
-      clock_in=>SDRAM_clk,
-      reset_in=>SDRAM_reset,
+      ddr_clock_in=>SDRAM_clk,
+      clock_in=>clk_main,
+      reset_in=>clk_reset,
 
-      axislavew_clock_in=>clk_main,
       axislavew_araddr_in=>ZTA_DATA_araddr,
       axislavew_arlen_in=>ZTA_DATA_arlen,
       axislavew_arvalid_in=>ZTA_DATA_arvalid, 
@@ -925,7 +1010,6 @@ axi_merge_inst : axi_merge
       axislavew_awsize_in=>ZTA_DATA_awsize,
       axislavew_bready_in=>ZTA_DATA_bready,
 
-      axislave1_clock_in=>clk_main,
       axislave1_araddr_in=>std_logic_vector(ibus2_araddr),
       axislave1_arlen_in=>std_logic_vector(ibus2_arlen),
       axislave1_arvalid_in=>ibus2_arvalid,
@@ -965,7 +1049,6 @@ axi_merge_inst : axi_merge
       axislave1_awsize_in=>(others=>'0'),
       axislave1_bready_in=>'0',
 
-      axislave2_clock_in=>clk_main,
       axislave2_araddr_in=>dbus2_araddr,
       axislave2_arlen_in=>dbus2_arlen,
       axislave2_arvalid_in=>dbus2_arvalid,
@@ -1005,7 +1088,6 @@ axi_merge_inst : axi_merge
       axislave2_awsize_in=>dbus2_awsize,
       axislave2_bready_in=>dbus2_bready,
 
-      axislave0_clock_in=>clk_main,
       axislave0_araddr_in=>rvdma_araddr,
       axislave0_arlen_in=>rvdma_arlen,
       axislave0_arvalid_in=>rvdma_arvalid,
@@ -1045,46 +1127,45 @@ axi_merge_inst : axi_merge
       axislave0_awsize_in=>vdma_awsize,
       axislave0_bready_in=>vdma_bready,
                               
-      aximaster_araddr_out=>SDRAM_araddr2,
-      aximaster_arlen_out=>SDRAM_arlen2,
-      aximaster_arvalid_out=>SDRAM_arvalid2,
-      aximaster_arid_out=>open,
-      aximaster_arlock_out=>open,
-      aximaster_arcache_out=>open,
-      aximaster_arprot_out=>open,
-      aximaster_arqos_out=>open,
-      aximaster_rid_in=>(others=>'0'), 
-      aximaster_rvalid_in=>SDRAM_rvalid2,
-      aximaster_rlast_in=>SDRAM_rlast2,
-      aximaster_rdata_in=>SDRAM_rdata2,
-      aximaster_rdata_mask_out=>SDRAM_rdata_mask2,
-      aximaster_rresp_in=>SDRAM_rresp2,
-      aximaster_arready_in=>SDRAM_arready2,
-      aximaster_rready_out=>SDRAM_rready2,
-      aximaster_arburst_out=>SDRAM_arburst2,
-      aximaster_arsize_out=>SDRAM_arsize2,
+      ddr_araddr_out=>SDRAM_araddr2,
+      ddr_arlen_out=>SDRAM_arlen2,
+      ddr_arvalid_out=>SDRAM_arvalid2,
+      ddr_arid_out=>open,
+      ddr_arlock_out=>open,
+      ddr_arcache_out=>open,
+      ddr_arprot_out=>open,
+      ddr_arqos_out=>open,
+      ddr_rid_in=>(others=>'0'), 
+      ddr_rvalid_in=>SDRAM_rvalid2,
+      ddr_rlast_in=>SDRAM_rlast2,
+      ddr_rdata_in=>SDRAM_rdata2,
+      ddr_rresp_in=>SDRAM_rresp2,
+      ddr_arready_in=>SDRAM_arready2,
+      ddr_rready_out=>SDRAM_rready2,
+      ddr_arburst_out=>SDRAM_arburst2,
+      ddr_arsize_out=>SDRAM_arsize2,
 
-      aximaster_awaddr_out=>SDRAM_awaddr2,
-      aximaster_awlen_out=>SDRAM_awlen2,
-      aximaster_awvalid_out=>SDRAM_awvalid2,
-      aximaster_wvalid_out=>SDRAM_wvalid2,
-      aximaster_wdata_out=>SDRAM_wdata2,
-      aximaster_wdata_mask_out=>SDRAM_wdata_mask2,
-      aximaster_wlast_out=>SDRAM_wlast2,
-      aximaster_wstrb_out=>SDRAM_wstrb2,
-      aximaster_awready_in=>SDRAM_awready2,
-      aximaster_wready_in=>SDRAM_wready2,
-      aximaster_bresp_in=>SDRAM_bresp2,
-      aximaster_bid_in=>(others=>'0'),
-      aximaster_bvalid_in=>SDRAM_bvalid2,
-      aximaster_awburst_out=>SDRAM_awburst2,
-      aximaster_awcache_out=>open,
-      aximaster_awid_out=>open,
-      aximaster_awlock_out=>open,
-      aximaster_awprot_out=>open,
-      aximaster_awqos_out=>open,
-      aximaster_awsize_out=>SDRAM_awsize2,
-      aximaster_bready_out=>SDRAM_bready2
+      ddr_awaddr_out=>SDRAM_awaddr2,
+      ddr_awlen_out=>SDRAM_awlen2,
+      ddr_awvalid_out=>SDRAM_awvalid2,
+      ddr_wvalid_out=>SDRAM_wvalid2,
+      ddr_wdata_out=>SDRAM_wdata2,
+      ddr_wdata_mask_out=>SDRAM_wdata_mask2,
+      ddr_wlast_out=>SDRAM_wlast2,
+      ddr_wstrb_out=>SDRAM_wstrb2,
+      ddr_awready_in=>SDRAM_awready2,
+      ddr_wready_in=>SDRAM_wready2,
+      ddr_bresp_in=>SDRAM_bresp2,
+      ddr_bid_in=>(others=>'0'),
+      ddr_bvalid_in=>SDRAM_bvalid2,
+      ddr_awburst_out=>SDRAM_awburst2,
+      ddr_awcache_out=>open,
+      ddr_awid_out=>open,
+      ddr_awlock_out=>open,
+      ddr_awprot_out=>open,
+      ddr_awqos_out=>open,
+      ddr_awsize_out=>SDRAM_awsize2,
+      ddr_bready_out=>SDRAM_bready2
    );
 
 axi_apb_bridge_inst : axi_apb_bridge
@@ -1245,6 +1326,9 @@ axi_stream_read_inst : axi_stream_read
    ZTA_DATA_awlen(awlen'length-1 downto 0) <= std_logic_vector(awlen);
    
    ztachip_inst : ztachip 
+      GENERIC MAP (
+         FPU_ENABLED => fpu_enabled_c
+      )
       PORT MAP ( 
 
          -- clk_main is the main clock for ztachip and riscv
@@ -1264,6 +1348,8 @@ axi_stream_read_inst : axi_stream_read
          -- However, with ASIC, we should have a reset (active low)
 
          reset_in=>clk_reset, 
+
+         debug_in=>ogpio(3 downto 0),
 
          -- Read bus from DDR memory.
          -- All tensor memory transfer from DDR memory to internal
@@ -1329,7 +1415,20 @@ axi_stream_read_inst : axi_stream_read
          axilite_wready_out=>ZTA_CONTROL_wready,
          axilite_bvalid_out=>ZTA_CONTROL_bvalid,
          axilite_bready_in=>ZTA_CONTROL_bready,
-         axilite_bresp_out=>ZTA_CONTROL_bresp
+         axilite_bresp_out=>ZTA_CONTROL_bresp,
+
+         -- AXI slave to access SRAM
+         axislave_araddr_in=>sram_araddr,
+         axislave_arburst_in=>sram_arburst,
+         axislave_arlen_in=>sram_arlen,
+         axislave_arready_out=>sram_arready,
+         axislave_arsize_in=>sram_arsize,
+         axislave_arvalid_in=>sram_arvalid,
+         axislave_rdata_out=>sram_rdata,
+         axislave_rlast_out=>sram_rlast,
+         axislave_rready_in=>sram_rready,
+         axislave_rresp_out=>sram_rresp,
+         axislave_rvalid_out=>sram_rvalid
    );
 
    SDRAM_araddr <= SDRAM_araddr2;
@@ -1434,8 +1533,8 @@ gpio_inst:gpio
       apb_pwdata=>APB_PWDATA,
       apb_prdata=>APB_PRDATA,
       apb_pslverror=>APB_PSLVERROR,
-      led_out=>led,
-      button_in=>pushbutton
+      led_out=>ogpio,
+      button_in=>igpio
    );
 
 UART_INST:UART 

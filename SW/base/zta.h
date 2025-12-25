@@ -23,7 +23,7 @@
 #ifndef _ZTA_H_
 #define _ZTA_H_
 
-#define NUM_PCORE 8  // Number of PCORES: 4 or 8
+#include "config.h"
 
 #define MEM_MAP  0x80000000 // ztachip address as mapped on AXI bus.
 
@@ -224,15 +224,15 @@
 
 #define CONSTANT_SIZE  (1<<CONSTANT_DEPTH)
 
-// Number of address bits to access DDR space window
-
-#define DP_ADDR_WIDTH  24
-
 // Max size of DDR space window
 
 #define MAX_DP_ADDR_SIZE  (1 << DP_ADDR_WIDTH)
 
 #define MCAST_WIDTH  (1+CID_DEPTH+PID_DEPTH)
+
+// DP address bus width. Wide enough to address largest allowed tensors
+
+#define DP_ADDR_WIDTH  MAX_TENSOR_LOG2_SIZE 
 
 // TENSOR core instructions
 
@@ -303,6 +303,14 @@
 #define REG_DP_INDICATION_PARM1  24
 
 #define REG_DP_READ_INDICATION_PARM  25
+
+#define REG_FPU_SET  26
+
+#define REG_FPU_EXE 27
+
+#define REG_FPU_SET_MEM 31
+
+#define REG_FPU_GET_STATUS 28
 
 #define REG_SERIAL_READ  26
 
@@ -408,17 +416,25 @@
 
 #define DP_OPCODE_PRINT  7
 
+#define DP_OPCODE_FPU_EXE 5 
+
 // Condition associated with REG_DP_RUN command
 
 #define DP_CONDITION_REGISTER_FLUSH  1  // Condition to wait for data transfers to/from register space be completed
 
 #define DP_CONDITION_SRAM_FLUSH  2 // Condition to wait for data transfers to/from sram memory space of process 0 be completed
 
+#define DP_CONDITION_FPU_IDLE  4 // Condition to wait for FPU
+
 #define DP_CONDITION_DDR_FLUSH  8 // Condition to wait for data transfers to/from ddr memory space be completed
 
-#define DP_CONDITION_ALL_FLUSH  11 // Condition to wait for all data transfers be completed
+#define DP_CONDITION_ALL_FLUSH  (DP_CONDITION_FPU_IDLE+DP_CONDITION_DDR_FLUSH+DP_CONDITION_SRAM_FLUSH+DP_CONDITION_REGISTER_FLUSH) // Condition to wait for all data transfers and FPU to be completed
+
+#define DP_CONDITION_DP_DONE  (DP_CONDITION_DDR_FLUSH+DP_CONDITION_SRAM_FLUSH+DP_CONDITION_REGISTER_FLUSH) // Condition to wait for all data transfers be completed
 
 // Data type
+
+#define BFLOAT  7   // 16-bit bfloat
 
 #define INT16  3   // 16bit data type to encode 12-bit integer
 
@@ -429,6 +445,7 @@
 #define UINT8  4   // uint8, zero padded for MSB
 
 #define UFLOAT8  6   // int8, sign extension for MSB
+
 
 // DP template ID
 
@@ -455,5 +472,55 @@
 #define SPU_MAX  4
 
 #define SPU_LOOKUP_SIZE  (2*SPU_SIZE)
+
+//---------------------
+//-- Sub register values associated with register_fpu_set_c
+//-- General formula: A = B[+-]C*X*Y;
+//---------------------
+
+#define FPU_SET_P_A      0
+
+#define FPU_SET_P_B      1
+
+#define FPU_SET_P_C      2
+
+#define FPU_SET_P_X      3
+
+#define FPU_SET_P_Y      4
+
+#define FPU_SET_P_CNT    5
+
+#define FPU_SET_P_C2     6
+
+#define FPU_SET_W_FP16   0
+
+#define FPU_SET_W_FP32   16
+
+#define FPU_SET_W_INT8   32
+
+#define FPU_SET_M_VALUE  0
+
+#define FPU_SET_M_ADDR   8
+
+// FPU EXE commands
+
+#define FPU_EXE_MAC    1 // A = B+C*X*Y;
+
+#define FPU_EXE_GROUP_MAX    2 // A = MAX(B)
+
+#define FPU_EXE_RECIPROCAL 3 // A = 1/B; --Approximate
+
+#define FPU_EXE_SUM  4 // A = SUM(B); --Approximate
+
+#define FPU_EXE_EXP  5 // A = 2**B; where B is an INT8
+
+#define FPU_EXE_MAX    6 // A = MAX(B) for all items
+
+#define FPU_EXE_FMA    7 // A = SUM(X1*X2) for all items
+
+#define FPU_EXE_FLOOR  16 // A=FLOOR
+
+#define FPU_EXE_ABS 32 // A=ABS
+
 
 #endif

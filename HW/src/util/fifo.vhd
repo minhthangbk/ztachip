@@ -33,17 +33,18 @@ entity scfifo is
 	);
 	port 
 	(
-        clock_in        : in std_logic;
-        reset_in        : in std_logic;
-        data_in         : in std_logic_vector(DATA_WIDTH-1 downto 0);
-        write_in        : in std_logic;
-        read_in         : in std_logic;
-        q_out           : out std_logic_vector(DATA_WIDTH-1 downto 0);
-        ravail_out      : out std_logic_vector(FIFO_DEPTH-1 downto 0);
-        wused_out       : out std_logic_vector(FIFO_DEPTH-1 downto 0);
-        empty_out       : out std_logic;
-        full_out        : out std_logic;
-        almost_full_out : out std_logic
+      clock_in        : in std_logic;
+      reset_in        : in std_logic;
+      data_in         : in std_logic_vector(DATA_WIDTH-1 downto 0);
+      write_in        : in std_logic;
+      read_in         : in std_logic;
+      flush_in        : in std_logic:='0';
+      q_out           : out std_logic_vector(DATA_WIDTH-1 downto 0);
+      ravail_out      : out std_logic_vector(FIFO_DEPTH-1 downto 0);
+      wused_out       : out std_logic_vector(FIFO_DEPTH-1 downto 0);
+      empty_out       : out std_logic;
+      full_out        : out std_logic;
+      almost_full_out : out std_logic
 	);
 end scfifo;
 
@@ -63,10 +64,13 @@ signal ravail:unsigned(FIFO_DEPTH-1 downto 0);
 signal wused:unsigned(FIFO_DEPTH-1 downto 0);
 signal not_empty_r:std_logic;
 signal full_r:std_logic;
+signal write:std_logic;
 begin
 
 address_a <= std_logic_vector(waddr_r);
 address_b <= std_logic_vector(raddr);
+
+write <= write_in and (not flush_in);
 
 ram_i : DPRAM
    generic map
@@ -84,7 +88,7 @@ ram_i : DPRAM
         address_b => address_b,
         clock=>clock_in,
         data_a => data_in,
-        wren_a => write_in,
+        wren_a => write,
         q_b => q
       );
 
@@ -95,7 +99,6 @@ full_out <= full_r;
 almost_full_out <= '1' when (wused >= to_unsigned(ALMOST_FULL,FIFO_DEPTH)) else '0';
 ravail_out <= std_logic_vector(ravail);
 wused_out <= std_logic_vector(wused);
-raddr <= (raddr_r+1) when (read_in='1') else raddr_r;
 
 GEN_LOOKAHEAD_TRUE: if LOOKAHEAD=true generate
 q_out <= q;
@@ -104,7 +107,18 @@ end generate GEN_LOOKAHEAD_TRUE;
 GEN_LOOKAHEAD_FALSE: if LOOKAHEAD=false generate
 q_out <= q_r;
 end generate GEN_LOOKAHEAD_FALSE;
- 
+
+process(read_in,flush_in,waddr_r,raddr_r)
+begin
+if(flush_in='1') then
+   raddr <= waddr_r;
+elsif read_in='1' then
+   raddr <= (raddr_r+1);
+else
+   raddr <= raddr_r;
+end if;
+end process;
+
 process(clock_in,reset_in)
 begin
    if(reset_in='0') then
@@ -116,7 +130,7 @@ begin
       full_r <= '0';
    else
       if(rising_edge(clock_in)) then 
-         if(write_in = '1') then
+         if(write = '1') then
             waddr_r <= (waddr_r+1);
             if((waddr_r+2)=raddr) then
                full_r <= '1';

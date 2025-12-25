@@ -53,6 +53,22 @@ int16_t FLOAT2INT(float in);
 
 uint8_t *bmpRead(const char *filename,int *h,int *w);
 
+// Convert from BFLOAT to FLOAT
+inline float BF2F(float16_t x) {
+    float y;
+    ((uint16_t *)&y)[0] = 0;    
+    ((uint16_t *)&y)[1] = x;
+    return y;
+}
+
+// Convert from float to BFLOAT
+inline float16_t F2BF(float x) {
+    return ((uint16_t *)&x)[1];
+}
+
+// cast float to its hex presentation
+
+#define F2HEX(x)  (*((uint32_t *)(&(x))))
 
 #ifdef __cplusplus
 }

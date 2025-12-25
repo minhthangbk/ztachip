@@ -21,6 +21,15 @@ set_property -dict {PACKAGE_PIN C9 IOSTANDARD LVCMOS33} [get_ports {pushbutton[1
 set_property -dict {PACKAGE_PIN B9 IOSTANDARD LVCMOS33} [get_ports {pushbutton[2]}]
 set_property -dict {PACKAGE_PIN B8 IOSTANDARD LVCMOS33} [get_ports {pushbutton[3]}]
 
+## SPI signals
+
+set_property -dict {PACKAGE_PIN C1 IOSTANDARD LVCMOS33} [get_ports spi_ss]
+set_property -dict {PACKAGE_PIN F1 IOSTANDARD LVCMOS33} [get_ports spi_sclk]
+set_property -dict {PACKAGE_PIN H1 IOSTANDARD LVCMOS33} [get_ports spi_mosi]
+set_property -dict {PACKAGE_PIN R11 IOSTANDARD LVCMOS33} [get_ports spi_cs_sd]
+set_property -dict {PACKAGE_PIN N14 IOSTANDARD LVCMOS33} [get_ports spi_cs_esp32]
+set_property -dict {PACKAGE_PIN G1 IOSTANDARD LVCMOS33} [get_ports spi_miso]
+
 ##Pmod Header JB
 
 #set_property -dict {PACKAGE_PIN E15 IOSTANDARD LVCMOS33} [get_ports {VGA_R[0]}]

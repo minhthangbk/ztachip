@@ -86,9 +86,9 @@ end TCM;
 architecture rtl of TCM is
 
 signal ram_q1:std_logic_vector(31 downto 0);
-signal ram_raddr1:std_logic_vector(RAM_DEPTH-3 downto 0);
+signal ram_raddr1:std_logic_vector(RAM_DEPTH-1 downto 0);
 signal ram_q2:std_logic_vector(31 downto 0);
-signal ram_raddr2:std_logic_vector(RAM_DEPTH-3 downto 0);
+signal ram_raddr2:std_logic_vector(RAM_DEPTH-1 downto 0);
 signal ram_waddr:std_logic_vector(RAM_DEPTH-3 downto 0);
 signal ram_wdata:std_logic_vector(31 downto 0);
 signal ram_wren:std_logic;
@@ -96,43 +96,6 @@ signal ram_be:std_logic_vector(3 downto 0);
 
 begin
 
---ram1_i:DPRAM_BE
---   GENERIC MAP (
---        numwords_a=>2**(RAM_DEPTH-2),
---        numwords_b=>2**(RAM_DEPTH-2),
---        widthad_a=>RAM_DEPTH-2,
---        widthad_b=>RAM_DEPTH-2,
---        width_a=>32,
---        width_b=>32
---    )
---    PORT MAP (
---        address_a=>ram_waddr,
---        byteena_a=>ram_be,
---        clock0=>TCM_clk,
---        data_a=>ram_wdata,
---        q_b=>ram_q1,
---        wren_a=>ram_wren,
---        address_b=>ram_raddr1
---    );
---
---ram2_i:DPRAM_BE
---   GENERIC MAP (
---        numwords_a=>2**(RAM_DEPTH-2),
---        numwords_b=>2**(RAM_DEPTH-2),
---        widthad_a=>RAM_DEPTH-2,
---        widthad_b=>RAM_DEPTH-2,
---        width_a=>32,
---        width_b=>32
---    )
---    PORT MAP (
---        address_a=>ram_waddr,
---        byteena_a=>ram_be,
---        clock0=>TCM_clk,
---        data_a=>ram_wdata,
---        q_b=>ram_q2,
---        wren_a=>ram_wren,
---        address_b=>ram_raddr2
---    );
 
 ram_i:ram2r1w
    GENERIC MAP (
@@ -150,85 +113,86 @@ ram_i:ram2r1w
         byteena_a=>ram_be,
         data_a=>ram_wdata,
         wren_a=>ram_wren,
-        address1_b=>ram_raddr1,
+        address1_b=>ram_raddr1(ram_raddr1'length-1 downto 2),
         q1_b=>ram_q1,
-        address2_b=>ram_raddr2,
+        address2_b=>ram_raddr2(ram_raddr2'length-1 downto 2),
         q2_b=>ram_q2
     );
 
-TCM_read1_i:TCM_read
+TCM_read1_i:axi_ram_read
    generic map(
-      RAM_DEPTH=>RAM_DEPTH
+      RAM_DEPTH=>RAM_DEPTH,
+      RAM_LATENCY=>1
    )
    port map(   
-      TCM_clk=>TCM_clk,
-      TCM_reset=>TCM_reset,
-      TCM_araddr=>TCM_araddr1,
-      TCM_arburst=>TCM_arburst1,
-      TCM_arlen=>TCM_arlen1,
-      TCM_arready=>TCM_arready1,
-      TCM_arsize=>TCM_arsize1,
-      TCM_arvalid=>TCM_arvalid1,
-      TCM_rdata=>TCM_rdata1,
-      TCM_rlast=>TCM_rlast1,
-      TCM_rready=>TCM_rready1,
-      TCM_rresp=>TCM_rresp1,
-      TCM_rvalid=>TCM_rvalid1,
-
-      ram_q=>ram_q1,
-      ram_raddr=>ram_raddr1
+      axislave_clock_in=>TCM_clk,
+      axislave_reset_in=>TCM_reset,
+      axislave_araddr_in=>TCM_araddr1,
+      axislave_arburst_in=>TCM_arburst1,
+      axislave_arlen_in=>TCM_arlen1,
+      axislave_arready_out=>TCM_arready1,
+      axislave_arsize_in=>TCM_arsize1,
+      axislave_arvalid_in=>TCM_arvalid1,
+      axislave_rdata_out=>TCM_rdata1,
+      axislave_rlast_out=>TCM_rlast1,
+      axislave_rready_in=>TCM_rready1,
+      axislave_rresp_out=>TCM_rresp1,
+      axislave_rvalid_out=>TCM_rvalid1,
+      ram_q_in=>ram_q1,
+      ram_raddr_out=>ram_raddr1,
+      ram_read_out=>open
    );
 
-TCM_read2_i:TCM_read
+TCM_read2_i:axi_ram_read
    generic map(
-      RAM_DEPTH=>RAM_DEPTH
+      RAM_DEPTH=>RAM_DEPTH,
+      RAM_LATENCY=>1
    )
    port map(   
-      TCM_clk=>TCM_clk,
-      TCM_reset=>TCM_reset,
-      TCM_araddr=>TCM_araddr2,
-      TCM_arburst=>TCM_arburst2,
-      TCM_arlen=>TCM_arlen2,
-      TCM_arready=>TCM_arready2,
-      TCM_arsize=>TCM_arsize2,
-      TCM_arvalid=>TCM_arvalid2,
-      TCM_rdata=>TCM_rdata2,
-      TCM_rlast=>TCM_rlast2,
-      TCM_rready=>TCM_rready2,
-      TCM_rresp=>TCM_rresp2,
-      TCM_rvalid=>TCM_rvalid2,
-
-      ram_q=>ram_q2,
-      ram_raddr=>ram_raddr2
+      axislave_clock_in=>TCM_clk,
+      axislave_reset_in=>TCM_reset,
+      axislave_araddr_in=>TCM_araddr2,
+      axislave_arburst_in=>TCM_arburst2,
+      axislave_arlen_in=>TCM_arlen2,
+      axislave_arready_out=>TCM_arready2,
+      axislave_arsize_in=>TCM_arsize2,
+      axislave_arvalid_in=>TCM_arvalid2,
+      axislave_rdata_out=>TCM_rdata2,
+      axislave_rlast_out=>TCM_rlast2,
+      axislave_rready_in=>TCM_rready2,
+      axislave_rresp_out=>TCM_rresp2,
+      axislave_rvalid_out=>TCM_rvalid2,
+      ram_q_in=>ram_q2,
+      ram_raddr_out=>ram_raddr2
    );
 
-TCM_write_i:TCM_write
+TCM_write_i:axi_ram_write
    generic map(
       RAM_DEPTH=>RAM_DEPTH
    )
    port map(   
-      TCM_clk=>TCM_clk,
-      TCM_reset=>TCM_reset,
+      axislave_clock_in=>TCM_clk,
+      axislave_reset_in=>TCM_reset,
 
-      TCM_awaddr=>TCM_awaddr,
-      TCM_awburst=>TCM_awburst,
-      TCM_awlen=>TCM_awlen,
-      TCM_awready=>TCM_awready,
-      TCM_awsize=>TCM_awsize,
-      TCM_awvalid=>TCM_awvalid,
-      TCM_bready=>TCM_bready,
-      TCM_bresp=>TCM_bresp,
-      TCM_bvalid=>TCM_bvalid,
-      TCM_wdata=>TCM_wdata,
-      TCM_wlast=>TCM_wlast,
-      TCM_wready=>TCM_wready,
-      TCM_wstrb=>TCM_wstrb,
-      TCM_wvalid=>TCM_wvalid,
+      axislave_awaddr_in=>TCM_awaddr,
+      axislave_awburst_in=>TCM_awburst,
+      axislave_awlen_in=>TCM_awlen,
+      axislave_awready_out=>TCM_awready,
+      axislave_awsize_in=>TCM_awsize,
+      axislave_awvalid_in=>TCM_awvalid,
+      axislave_bready_in=>TCM_bready,
+      axislave_bresp_out=>TCM_bresp,
+      axislave_bvalid_out=>TCM_bvalid,
+      axislave_wdata_in=>TCM_wdata,
+      axislave_wlast_in=>TCM_wlast,
+      axislave_wready_out=>TCM_wready,
+      axislave_wstrb_in=>TCM_wstrb,
+      axislave_wvalid_in=>TCM_wvalid,
 
-      ram_waddr=>ram_waddr,
-      ram_wdata=>ram_wdata,
-      ram_wren=>ram_wren,
-      ram_be=>ram_be
+      ram_waddr_out=>ram_waddr,
+      ram_wdata_out=>ram_wdata,
+      ram_wren_out=>ram_wren,
+      ram_be_out=>ram_be
    );
 
 end rtl;

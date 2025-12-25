@@ -180,7 +180,13 @@ ENTITY dp_core IS
 
             -- Indication
             SIGNAL indication_avail_out             : OUT STD_LOGIC;
-            
+
+            SIGNAL fpu_busy_vm_in                   : IN STD_LOGIC_VECTOR(1 DOWNTO 0);
+
+            SIGNAL fpu_exe_out                      : OUT STD_LOGIC;
+
+            SIGNAL fpu_exe_vm_out                   : OUT STD_LOGIC;
+
             SIGNAL ddr_tx_busy_in                   : IN STD_LOGIC
     );
 END dp_core;
@@ -394,6 +400,12 @@ dp0_i: dp
         bar_in=>bar_in,
 
         indication_avail_out => indication_avail_out,
+
+        fpu_busy_vm_in => fpu_busy_vm_in,
+
+        fpu_exe_out => fpu_exe_out,
+
+        fpu_exe_vm_out => fpu_exe_vm_out,
         
         ddr_tx_busy_in => ddr_tx_busy_in
     );

@@ -113,9 +113,9 @@ module riscv (
   wire       [2:0]    _zz_dbus_axi_arw_payload_len;
   reg                 resetCtrl_mainClkResetUnbuffered;
   reg        [5:0]    resetCtrl_systemClkResetCounter;
-  wire       [5:0]    _zz_when_riscv_l154;
-  wire                when_riscv_l154;
-  wire                when_riscv_l158;
+  wire       [5:0]    _zz_when_riscv_l155;
+  wire                when_riscv_l155;
+  wire                when_riscv_l159;
   reg                 resetCtrl_mainClkReset;
   reg                 resetCtrl_systemReset;
   wire                system_timerInterrupt;
@@ -281,14 +281,14 @@ module riscv (
 
   always @(*) begin
     resetCtrl_mainClkResetUnbuffered = 1'b0;
-    if(when_riscv_l154) begin
+    if(when_riscv_l155) begin
       resetCtrl_mainClkResetUnbuffered = 1'b1;
     end
   end
 
-  assign _zz_when_riscv_l154[5 : 0] = 6'h3f;
-  assign when_riscv_l154 = (resetCtrl_systemClkResetCounter != _zz_when_riscv_l154);
-  assign when_riscv_l158 = io_asyncReset_buffercc_io_dataOut;
+  assign _zz_when_riscv_l155[5 : 0] = 6'h3f;
+  assign when_riscv_l155 = (resetCtrl_systemClkResetCounter != _zz_when_riscv_l155);
+  assign when_riscv_l159 = io_asyncReset_buffercc_io_dataOut;
   assign system_timerInterrupt = 1'b0;
   assign system_externalInterrupt = 1'b0;
   assign system_cpu_iBus_rsp_payload_error = (! (io_iBus_r_payload_resp == 2'b00));
@@ -443,10 +443,10 @@ module riscv (
   assign io_dBus_ar_payload_prot = dbus_axi_arw_payload_prot;
   assign io_dBus_r_ready = dbus_axi_r_ready;
   always @(posedge io_mainClk) begin
-    if(when_riscv_l154) begin
+    if(when_riscv_l155) begin
       resetCtrl_systemClkResetCounter <= (resetCtrl_systemClkResetCounter + 6'h01);
     end
-    if(when_riscv_l158) begin
+    if(when_riscv_l159) begin
       resetCtrl_systemClkResetCounter <= 6'h00;
     end
   end
@@ -4338,7 +4338,7 @@ module VexRiscv (
   assign IBusCachedPlugin_mmuBus_rsp_allowRead = 1'b1;
   assign IBusCachedPlugin_mmuBus_rsp_allowWrite = 1'b1;
   assign IBusCachedPlugin_mmuBus_rsp_allowExecute = 1'b1;
-  assign IBusCachedPlugin_mmuBus_rsp_isIoAccess = (IBusCachedPlugin_mmuBus_rsp_physicalAddress[31 : 31] == 1'b1);
+  assign IBusCachedPlugin_mmuBus_rsp_isIoAccess = ((IBusCachedPlugin_mmuBus_rsp_physicalAddress[31 : 31] == 1'b1) || (IBusCachedPlugin_mmuBus_rsp_physicalAddress[31 : 30] == 2'b01));
   assign IBusCachedPlugin_mmuBus_rsp_isPaging = 1'b0;
   assign IBusCachedPlugin_mmuBus_rsp_exception = 1'b0;
   assign IBusCachedPlugin_mmuBus_rsp_refilling = 1'b0;
@@ -4347,7 +4347,7 @@ module VexRiscv (
   assign DBusCachedPlugin_mmuBus_rsp_allowRead = 1'b1;
   assign DBusCachedPlugin_mmuBus_rsp_allowWrite = 1'b1;
   assign DBusCachedPlugin_mmuBus_rsp_allowExecute = 1'b1;
-  assign DBusCachedPlugin_mmuBus_rsp_isIoAccess = (DBusCachedPlugin_mmuBus_rsp_physicalAddress[31 : 31] == 1'b1);
+  assign DBusCachedPlugin_mmuBus_rsp_isIoAccess = ((DBusCachedPlugin_mmuBus_rsp_physicalAddress[31 : 31] == 1'b1) || (DBusCachedPlugin_mmuBus_rsp_physicalAddress[31 : 30] == 2'b01));
   assign DBusCachedPlugin_mmuBus_rsp_isPaging = 1'b0;
   assign DBusCachedPlugin_mmuBus_rsp_exception = 1'b0;
   assign DBusCachedPlugin_mmuBus_rsp_refilling = 1'b0;

@@ -26,6 +26,7 @@ use std.standard.all;
 LIBRARY ieee;
 USE ieee.std_logic_1164.all;
 use IEEE.numeric_std.all;
+use IEEE.MATH_REAL.ALL;
 use work.config.all;
 
 package ztachip_pkg is
@@ -71,6 +72,7 @@ subtype axi_rvalid_t is std_logic;
 subtype axi_rlast_t is std_logic;
 subtype axi_rdata_t is std_logic_vector(31 downto 0);
 subtype axi_rdata64_t is std_logic_vector(63 downto 0);
+subtype axi_rdata128_t is std_logic_vector(127 downto 0);
 subtype axi_rresp_t is std_logic_vector(1 downto 0);
 subtype axi_arready_t is std_logic;
 subtype axi_rready_t is std_logic;
@@ -90,6 +92,7 @@ type axi_rvalids_t is array(natural range <>) of axi_rvalid_t;
 type axi_rlasts_t is array(natural range <>) of axi_rlast_t;
 type axi_rdatas_t is array(natural range <>) of axi_rdata_t;
 type axi_rdata64s_t is array(natural range <>) of axi_rdata64_t;
+type axi_rdata128s_t is array(natural range <>) of axi_rdata128_t;
 type axi_rresps_t is array(natural range <>) of axi_rresp_t;
 type axi_arreadys_t is array(natural range <>) of axi_arready_t;
 type axi_rreadys_t is array(natural range <>) of axi_rready_t;
@@ -106,9 +109,11 @@ subtype axi_awvalid_t is std_logic;
 subtype axi_wvalid_t is std_logic;
 subtype axi_wdata_t is std_logic_vector(31 downto 0);
 subtype axi_wdata64_t is std_logic_vector(63 downto 0);
+subtype axi_wdata128_t is std_logic_vector(127 downto 0);
 subtype axi_wlast_t is std_logic;
 subtype axi_wstrb_t is std_logic_vector(3 downto 0);
 subtype axi_wstrb8_t is std_logic_vector(7 downto 0);
+subtype axi_wstrb16_t is std_logic_vector(15 downto 0);
 subtype axi_awready_t is std_logic;
 subtype axi_wready_t is std_logic;
 subtype axi_bresp_t is std_logic_vector(1 downto 0);
@@ -129,9 +134,11 @@ type axi_awvalids_t is array(natural range <>) of axi_awvalid_t;
 type axi_wvalids_t is array(natural range <>) of axi_wvalid_t;
 type axi_wdatas_t is array(natural range <>) of axi_wdata_t;
 type axi_wdata64s_t is array(natural range <>) of axi_wdata64_t;
+type axi_wdata128s_t is array(natural range <>) of axi_wdata128_t;
 type axi_wlasts_t is array(natural range <>) of axi_wlast_t;
 type axi_wstrbs_t is array(natural range <>) of axi_wstrb_t;
 type axi_wstrb8s_t is array(natural range <>) of axi_wstrb8_t;
+type axi_wstrb16s_t is array(natural range <>) of axi_wstrb16_t;
 type axi_awreadys_t is array(natural range <>) of axi_awready_t;
 type axi_wreadys_t is array(natural range <>) of axi_wready_t;
 type axi_bresps_t is array(natural range <>) of axi_bresp_t;
@@ -202,7 +209,7 @@ constant ddr_data_width_c   :integer:=(data_width_c*ddr_vector_width_c);
 
 constant ddr_data_byte_width_c: integer:=(ddr_data_width_c/8);
 
-constant ddr_burstlen_width_c: integer:=3;
+constant ddr_burstlen_width_c: integer:=4;
 
 constant ddrx_data_width_c  :integer:=(register_width_c*ddr_vector_width_c);
 
@@ -468,8 +475,8 @@ constant mu_opcode_cmp_eq_c             :STD_LOGIC_VECTOR(mu_instruction_oc_widt
 constant mu_opcode_cmp_ne_c             :STD_LOGIC_VECTOR(mu_instruction_oc_width_c-1 DOWNTO 0):="01011"; -- X1 != X2
 constant mu_opcode_mul_c                :STD_LOGIC_VECTOR(mu_instruction_oc_width_c-1 DOWNTO 0):="01100"; -- Y=X1*X2
 constant mu_opcode_acc_set_c            :STD_LOGIC_VECTOR(mu_instruction_oc_width_c-1 DOWNTO 0):="01101"; -- ACC=X1
-constant mu_opcode_get_mantissa_c       :STD_LOGIC_VECTOR(mu_instruction_oc_width_c-1 DOWNTO 0):="01111"; -- Get Mantissa+sign part of float number
-constant mu_opcode_get_exponent_c       :STD_LOGIC_VECTOR(mu_instruction_oc_width_c-1 DOWNTO 0):="10000"; -- Get exponent part of float number
+constant mu_opcode_lsb4_c               :STD_LOGIC_VECTOR(mu_instruction_oc_width_c-1 DOWNTO 0):="01111"; -- Get Mantissa+sign part of float number
+constant mu_opcode_msb4_c               :STD_LOGIC_VECTOR(mu_instruction_oc_width_c-1 DOWNTO 0):="10000"; -- Get exponent part of float number
 constant mu_opcode_set_exponent_c       :STD_LOGIC_VECTOR(mu_instruction_oc_width_c-1 DOWNTO 0):="10001"; -- Set exponent part of float number
 constant mu_opcode_set_float_c          :STD_LOGIC_VECTOR(mu_instruction_oc_width_c-1 DOWNTO 0):="10010"; -- Set float from mantissa and exponent
 constant mu_opcode_shl_c                :STD_LOGIC_VECTOR(mu_instruction_oc_width_c-1 DOWNTO 0):= "10011"; -- Shift operation on accumulator
@@ -640,6 +647,30 @@ subtype vector_fork_t is vectors_t(fork_max_c-1 downto 0);
 type vector_forks_t is array(natural range <>) of vector_fork_t;
 
 --------
+-- Floating point type definition
+-------
+
+constant fp12_exp_width_c:integer:=4;
+
+constant fp12_mantissa_width_c:integer:=7;
+
+constant fp32_exp_width_c:integer:=8;
+
+constant fp32_mantissa_width_c:integer:=23;
+
+subtype fp12_t is std_logic_vector(11 downto 0); 
+
+subtype fp16_t is std_logic_vector(15 downto 0);
+
+subtype fp32_t is std_logic_vector(31 downto 0);
+
+-------
+-- FPU type definitions
+------
+
+subtype fpu_opcode_t is unsigned(3 downto 0); 
+
+--------
 -- DP Read latency
 --------
 
@@ -727,13 +758,15 @@ constant dp_data_type_integer_c     :dp_data_type_t:="01";    -- DP datatype is 
 
 constant dp_data_type_uinteger_c    :dp_data_type_t:="10";    -- DP datatype is integer
 
+constant dp_data_type_bfloat_c      :dp_data_type_t:="11";    -- DP datatype is integer
+
 type dp_data_types_t is array(natural range <>) of dp_data_type_t;  -- array of DP datatypes
 
 --------
 --- DP window address width
 ---------
 
-constant dp_addr_width_c: integer:=24;
+constant dp_addr_width_c: integer:=MAX_TENSOR_LOG2_SIZE;
 
 ---
 -- Full address for DP engine
@@ -756,7 +789,7 @@ type stream_ids_t is array(natural range <>) of stream_id_t;
 -- DP instruction fifo depth. This fifo is where mcore is pushing instructions to
 ---------
 
-constant dp_fifo_depth_c :integer:=8;
+constant dp_fifo_depth_c :integer:=7;
 
 constant dp_fifo_max_c :integer:=(2**dp_fifo_depth_c-1);
 
@@ -863,6 +896,8 @@ constant dp_condition_register_flush_c:integer:=0; -- Wait for all write to regi
 
 constant dp_condition_sram_flush_c:integer:=1; -- Wait for all read/write to scratch space of process 0 to be completed
 
+constant dp_condition_fpu_idle_c:integer:=2; -- FPU is idle
+
 constant dp_condition_ddr_flush_c:integer:=3; -- Wait for all write to DDR space to be completed
 
 subtype dp_condition_t is std_logic_vector(3 downto 0); -- DP condition datatype
@@ -878,6 +913,7 @@ constant dp_opcode_indication_c    :integer:=6;    -- Send an indication signal 
 constant dp_opcode_log_on_c        :integer:=2;    -- Enable log
 constant dp_opcode_log_off_c       :integer:=3;    -- Disable log
 constant dp_opcode_print_c         :integer:=7;    -- Send debug print message
+constant dp_opcode_fpu_exe_c       :integer:=5;    -- Execute FPU unit
 subtype dp_opcode_t is unsigned(2 downto 0);       -- DP opcode datatype
 
 
@@ -908,7 +944,7 @@ type dp_threads_t is array(natural range <>) of dp_thread_t;
 -- DP log
 ------
 
-constant log_depth_c:integer:=8;
+constant log_depth_c:integer:=7;
 constant log_max_c:integer:=(2**log_depth_c);
 subtype log_type_t is std_logic_vector(1 downto 0);
 constant log_type_none_c:log_type_t:="00"; -- No log event
@@ -1020,16 +1056,77 @@ constant register_dp_max_pcore_c                :integer:=22; -- Set max number 
 constant register_dp_indication_parm0_c         :integer:=23; -- Read indication parm0
 constant register_dp_indication_parm1_c         :integer:=24; -- Read indication parm1
 constant register_dp_read_indication_parm_c     :integer:=25; -- Read indication message-id
-constant register_serial_read_c                 :integer:=26; -- Read serial port
-constant register_serial_write_c                :integer:=27; -- Write serial port
-constant register_serial_read_avail_c           :integer:=28; -- Number of bytes available in serial port for reading
+constant register_fpu_set_c                     :integer:=26; -- Read serial port
+constant register_fpu_exe_c                     :integer:=27; -- Write serial port
+constant register_fpu_get_status_c              :integer:=28; -- Number of bytes available in serial port for reading
+constant register_fpu_set_mem                   :integer:=31; -- Set memory page for FPU(per VM)
 constant register_serial_write_avail_c          :integer:=29; -- Number of bytes that can be sent on serial port
 constant register_dp_resume_c                   :integer:=30; -- Number of bytes that can be sent on serial port
 constant register_dp_restore_c                  :integer:=13; -- Restore dp_register to a source
 constant register_vm_toggle_c                   :integer:=9;  -- Toggle current VM
 
--- Sub register values associated with register_dp_src_template_c and register_dp_dest_template_c 
+---------------------
+-- Sub register values associated with register_fpu_set_c
+-- General formula: A = B+C*X*Y;
+-- There are 3 sub-fields
+--    P: Paramter
+--    M: mode; 0=value;1=address
+--    W: 0=fp16;1=fp32;2=int8;3=fp32-floor
+-- Register bit field has this format: M W A PPP 
+---------------------
+constant register2_fpu_set_P_MASK       :std_logic_vector:="000111"; -- Bit mask for P subfield
+constant register2_fpu_set_M_MASK       :std_logic_vector:="001000"; -- Bit mask for M subfield 
+constant register2_fpu_set_W_MASK       :std_logic_vector:="110000"; -- Bit mask for W subfield
+constant register2_fpu_set_P_A          :integer:=0; -- P subfield to set A parameter
+constant register2_fpu_set_P_B          :integer:=1; -- P subfield to set B parameter
+constant register2_fpu_set_P_C          :integer:=2; -- P subfield to set C parameter
+constant register2_fpu_set_P_X          :integer:=3; -- P subfield to set X parameter
+constant register2_fpu_set_P_Y          :integer:=4; -- P subfield to set Y parameter
+constant register2_fpu_set_P_CNT        :integer:=5; -- P subfield to set CNT parameter
+constant register2_fpu_set_P_C2         :integer:=6; -- P subfield to set C2 parameter
+constant register2_fpu_set_W_FP16       :integer:=0; -- W subfield for FP16 data type
+constant register2_fpu_set_W_FP32       :integer:=16; -- W subfield for FP32 data type.
+constant register2_fpu_set_W_INT8       :integer:=32; -- W subfield for INT8 data type.
+constant register2_fpu_set_M_VALUE      :integer:=0; -- M subfield for access by value
+constant register2_fpu_set_M_ADDR       :integer:=8; -- M subfield for access by SRAM address
+-------
+-- Sub register values associated with register_fpu_exe_c
+-- 3 types of opcodes (defined by subfields below) that can be executed 
+-- same time
+--
+-- A F XXXX
+--    A = ABS
+--    F = FLOOR
+--    XXXX = fpu_opcode_t; 1->MAC;2->MAX;3->RECIPROCAL;4->SUM 
+------
 
+constant register2_fpu_exe_A_MASK_c:std_logic_vector:="100000";
+
+constant register2_fpu_exe_F_MASK_c:std_logic_vector:="010000";
+
+constant register2_fpu_exe_X_MASK_c:std_logic_vector:="001111";
+
+constant register2_fpu_exe_mac_c:integer:=1; -- A = B + C*X*Y;
+
+constant register2_fpu_exe_group_max_c:integer:=2; -- A = MAX(B) in group of C items
+
+constant register2_fpu_exe_reciprocal_c:integer:=3; -- A=1/B (approximated only)
+
+constant register2_fpu_exe_sum_c:integer:=4; -- A = SUM(B)
+
+constant register2_fpu_exe_exp_c:integer:=5; -- A = 2**B where B is INT8
+
+constant register2_fpu_exe_max_c:integer:=6; -- A = MAX(B) of all items
+
+constant register2_fpu_exe_fma_c:integer:=7; -- FMA
+
+constant register2_fpu_exe_floor_c:integer:=16; --A=FLOOR
+
+constant register2_fpu_exe_abs_c:integer:=32; --A=ABS
+
+--------------------------
+-- Sub register values associated with register_dp_src_template_c and register_dp_dest_template_c 
+--------------------------
 constant register2_dp_stride0_c         :integer:=0;    -- Set outer loop stride count
 constant register2_dp_stride0_count_c   :integer:=1;    -- Set outer loop count
 constant register2_dp_stride1_c         :integer:=2;    -- Set mid loop stride count
@@ -1110,6 +1207,18 @@ constant apb_uart_write_avail_c:integer:=72;
 
 constant apb_time_get_c:integer:=76;
 
+constant apb_time2_get_c:integer:=80;
+
+---------------------------------------------------------------------------
+--                       Function definition
+-------------------------------------------------------------------------
+
+function real_to_float32(input_real: real) return fp32_t;
+
+function float32_to_real(input_float: fp32_t) return real;
+
+function log2(n : natural) return natural;
+
 -----------------------------------------------------------------------------
 --
 --                       Component declaration
@@ -1117,11 +1226,16 @@ constant apb_time_get_c:integer:=76;
 -----------------------------------------------------------------------------
 
 component ztachip IS
+    generic (
+        FPU_ENABLED :boolean
+        );
     port(   
             clock_in                      : IN STD_LOGIC;
             clock_x2_in                   : IN STD_LOGIC;
             reset_in                      : IN STD_LOGIC;                       
                     
+            debug_in                      :IN STD_LOGIC_VECTOR(3 downto 0);
+
             axi_araddr_out                : OUT std_logic_vector(ddr_bus_width_c-1 downto 0);
             axi_arlen_out                 : OUT unsigned(ddr_burstlen_width_c-1 downto 0);
             axi_arvalid_out               : OUT std_logic;
@@ -1177,7 +1291,20 @@ component ztachip IS
             axilite_wready_out            : OUT std_logic;
             axilite_bvalid_out            : OUT std_logic;
             axilite_bready_in             : IN std_logic;
-            axilite_bresp_out             : OUT std_logic_vector(1 downto 0)
+            axilite_bresp_out             : OUT std_logic_vector(1 downto 0);
+
+            -- AXI slave to access sram
+            axislave_araddr_in            : IN STD_LOGIC_VECTOR(31 downto 0);
+            axislave_arburst_in           : IN STD_LOGIC_VECTOR(1 downto 0);
+            axislave_arlen_in             : IN STD_LOGIC_VECTOR(7 downto 0);
+            axislave_arready_out          : OUT STD_LOGIC;
+            axislave_arsize_in            : IN STD_LOGIC_VECTOR(2 downto 0);
+            axislave_arvalid_in           : IN STD_LOGIC;
+            axislave_rdata_out            : OUT STD_LOGIC_VECTOR(31 downto 0);
+            axislave_rlast_out            : OUT STD_LOGIC;
+            axislave_rready_in            : IN STD_LOGIC;
+            axislave_rresp_out            : OUT STD_LOGIC_VECTOR(1 downto 0);
+            axislave_rvalid_out           : OUT STD_LOGIC
             );
 END component;
 
@@ -1309,15 +1436,43 @@ COMPONENT sram_core IS
         SIGNAL dp_rd_fork_in           : IN dp_fork_t;
         SIGNAL dp_wr_fork_in           : IN dp_fork_t;
         SIGNAL dp_write_in             : IN STD_LOGIC;
+        SIGNAL dp_write_wait_out       : OUT STD_LOGIC;
         SIGNAL dp_write_vector_in      : IN dp_vector_t;
         SIGNAL dp_read_in              : IN STD_LOGIC;
+        SIGNAL dp_read_wait_out        : OUT STD_LOGIC;
         SIGNAL dp_read_vm_in           : IN STD_LOGIC;
         SIGNAL dp_read_vector_in       : IN dp_vector_t;
         SIGNAL dp_read_gen_valid_in    : IN STD_LOGIC;
         SIGNAL dp_writedata_in         : IN STD_LOGIC_VECTOR(fork_max_c*ddr_data_width_c-1 DOWNTO 0);
         SIGNAL dp_readdatavalid_out    : OUT STD_LOGIC;
         SIGNAL dp_readdatavalid_vm_out : OUT STD_LOGIC;
-        SIGNAL dp_readdata_out         : OUT STD_LOGIC_VECTOR(fork_max_c*ddr_data_width_c-1 DOWNTO 0)
+        SIGNAL dp_readdata_out         : OUT STD_LOGIC_VECTOR(fork_max_c*ddr_data_width_c-1 DOWNTO 0);
+
+         -- FPU interface
+         
+        SIGNAL fpu_rd_addr_in           : IN STD_LOGIC_VECTOR(sram_depth_c-1 DOWNTO 0);
+        SIGNAL fpu_wr_addr_in           : IN STD_LOGIC_VECTOR(sram_depth_c-1 DOWNTO 0);        
+        SIGNAL fpu_write_in             : IN STD_LOGIC;
+        SIGNAL fpu_write_wait_out       : OUT STD_LOGIC;
+        SIGNAL fpu_read_in              : IN STD_LOGIC;
+        SIGNAL fpu_read_wait_out        : OUT STD_LOGIC;
+        SIGNAL fpu_writedata_in         : IN STD_LOGIC_VECTOR(ddr_data_width_c-1 DOWNTO 0);
+        SIGNAL fpu_writebe_in           : IN STD_LOGIC_VECTOR(ddr_data_width_c/8-1 DOWNTO 0);
+        SIGNAL fpu_readdatavalid_out    : OUT STD_LOGIC;
+        SIGNAL fpu_readdata_out         : OUT STD_LOGIC_VECTOR(ddr_data_width_c-1 DOWNTO 0);
+
+        -- AXI interface for RISCV to access
+        SIGNAL axislave_araddr_in      : IN STD_LOGIC_VECTOR(31 downto 0);
+        SIGNAL axislave_arburst_in     : IN STD_LOGIC_VECTOR(1 downto 0);
+        SIGNAL axislave_arlen_in       : IN STD_LOGIC_VECTOR(7 downto 0);
+        SIGNAL axislave_arready_out    : OUT STD_LOGIC;
+        SIGNAL axislave_arsize_in      : IN STD_LOGIC_VECTOR(2 downto 0);
+        SIGNAL axislave_arvalid_in     : IN STD_LOGIC;
+        SIGNAL axislave_rdata_out      : OUT STD_LOGIC_VECTOR(31 downto 0);
+        SIGNAL axislave_rlast_out      : OUT STD_LOGIC;
+        SIGNAL axislave_rready_in      : IN STD_LOGIC;
+        SIGNAL axislave_rresp_out      : OUT STD_LOGIC_VECTOR(1 downto 0);
+        SIGNAL axislave_rvalid_out     : OUT STD_LOGIC
     );
 END COMPONENT;
 
@@ -1337,10 +1492,172 @@ COMPONENT sram IS
         SIGNAL dp_read_vector_in    : IN dp_vector_t;
         SIGNAL dp_read_gen_valid_in : IN STD_LOGIC;
         SIGNAL dp_writedata_in      : IN STD_LOGIC_VECTOR(ddr_data_width_c-1 DOWNTO 0);
+        SIGNAL dp_writebe_in        : IN STD_LOGIC_VECTOR(ddr_data_width_c/8-1 DOWNTO 0);
         SIGNAL dp_readdatavalid_out : OUT STD_LOGIC;
         SIGNAL dp_readdata_out      : OUT STD_LOGIC_VECTOR(ddr_data_width_c-1 DOWNTO 0)
     );
 END COMPONENT;
+
+COMPONENT fpu IS
+    PORT (
+        SIGNAL clock_in                 : IN STD_LOGIC;
+        SIGNAL reset_in                 : IN STD_LOGIC;
+
+        -- Bus interface for configuration        
+        SIGNAL bus_waddr_in             : IN register_addr_t;
+        SIGNAL bus_raddr_in             : IN register_addr_t;
+        SIGNAL bus_write_in             : IN STD_LOGIC;
+        SIGNAL bus_read_in              : IN STD_LOGIC;
+        SIGNAL bus_writedata_in         : IN STD_LOGIC_VECTOR(host_width_c-1 DOWNTO 0);
+        SIGNAL bus_readdata_out         : OUT STD_LOGIC_VECTOR(host_width_c-1 DOWNTO 0);
+        SIGNAL bus_readdatavalid_out    : OUT STD_LOGIC;
+        SIGNAL bus_writewait_out        : OUT STD_LOGIC;
+        SIGNAL bus_readwait_out         : OUT STD_LOGIC;
+
+        -- Bus interface to SRAM
+        SIGNAL fpu_rd_addr_out          : OUT STD_LOGIC_VECTOR(sram_depth_c-1 DOWNTO 0);
+        SIGNAL fpu_wr_addr_out          : OUT STD_LOGIC_VECTOR(sram_depth_c-1 DOWNTO 0);        
+        SIGNAL fpu_write_out            : OUT STD_LOGIC;
+        SIGNAL fpu_write_wait_in        : IN STD_LOGIC;
+        SIGNAL fpu_read_out             : OUT STD_LOGIC;
+        SIGNAL fpu_read_wait_in         : IN STD_LOGIC;
+        SIGNAL fpu_writedata_out        : OUT STD_LOGIC_VECTOR(ddr_data_width_c-1 DOWNTO 0);
+        SIGNAL fpu_writebe_out          : OUT STD_LOGIC_VECTOR(ddr_data_width_c/8-1 downto 0);
+        SIGNAL fpu_readdatavalid_in     : IN STD_LOGIC;
+        SIGNAL fpu_readdata_in          : IN STD_LOGIC_VECTOR(ddr_data_width_c-1 DOWNTO 0);
+
+        SIGNAL fpu_busy_vm_out          : OUT STD_LOGIC_VECTOR(1 DOWNTO 0);
+
+        SIGNAL fpu_exe_in               : IN STD_LOGIC;
+
+        SIGNAL fpu_exe_vm_in            : IN STD_LOGIC;
+
+        SIGNAL fpu_exe_out              : OUT STD_LOGIC
+    );
+END COMPONENT;
+
+COMPONENT falu_core IS
+    PORT (
+        SIGNAL clock_in             : IN STD_LOGIC;
+        SIGNAL reset_in             : IN STD_LOGIC;
+
+        SIGNAL step_in              : IN unsigned(sram_depth_c-1 DOWNTO 0);
+        SIGNAL opcode_in            : IN fpu_opcode_t;
+        SIGNAL input_ena_in         : IN STD_LOGIC;
+        SIGNAL input_eof_in         : IN STD_LOGIC;
+        SIGNAL input_last_in        : IN STD_LOGIC;
+        SIGNAL input_fast_in        : IN STD_LOGIC;
+        SIGNAL A_addr               : IN unsigned(sram_depth_c-1 DOWNTO 0);
+        SIGNAL A_precision          : IN unsigned(2 downto 0);
+        SIGNAL A_floor              : IN STD_LOGIC;
+        SIGNAL A_abs                : IN STD_LOGIC;
+        SIGNAL B_in                 : IN fp32_t;
+        SIGNAL C_in                 : IN fp32_t;
+        SIGNAL C2_in                : IN fp32_t;
+        SIGNAL X_in                 : IN fp32_t;
+        SIGNAL Y_in                 : IN fp32_t;
+
+        SIGNAL output_ena_out       : OUT STD_LOGIC;
+        SIGNAL output_eof_out       : OUT STD_LOGIC;
+        SIGNAL output_last_out      : OUT STD_LOGIC;
+        SIGNAL output_fast_out      : OUT STD_LOGIC;
+        SIGNAL output_addr_out      : OUT unsigned(sram_depth_c-1 DOWNTO 0);
+        SIGNAL output_precision_out : OUT unsigned(2 downto 0);
+        SIGNAL output_out           : OUT fp32_t
+    );
+END COMPONENT;
+
+COMPONENT falu IS
+    PORT (
+        SIGNAL clock_in             : IN STD_LOGIC;
+        SIGNAL reset_in             : IN STD_LOGIC;
+
+        SIGNAL step_in              : IN unsigned(sram_depth_c-1 DOWNTO 0);
+        SIGNAL opcode_in            : IN fpu_opcode_t;
+        SIGNAL input_ena_in         : IN STD_LOGIC;
+        SIGNAL input_eof_in         : IN STD_LOGIC;
+        SIGNAL input_last_in        : IN STD_LOGIC;
+        SIGNAL input_fast_in        : IN STD_LOGIC;
+        SIGNAL A_addr               : IN unsigned(sram_depth_c-1 DOWNTO 0);
+        SIGNAL A_precision          : IN unsigned(2 downto 0);
+        SIGNAL A_floor              : IN STD_LOGIC;
+        SIGNAL A_abs                : IN STD_LOGIC;
+        SIGNAL B_in                 : IN fp32_t;
+        SIGNAL C_in                 : IN fp32_t;
+        SIGNAL C2_in                : IN fp32_t;
+        SIGNAL X_in                 : IN fp32_t;
+        SIGNAL Y_in                 : IN fp32_t;
+
+        SIGNAL output_ena_out       : OUT STD_LOGIC;
+        SIGNAL output_step_out      : OUT unsigned(sram_depth_c-1 DOWNTO 0);
+        SIGNAL output_opcode_out    : OUT fpu_opcode_t;
+        SIGNAL output_eof_out       : OUT STD_LOGIC;
+        SIGNAL output_last_out      : OUT STD_LOGIC;
+        SIGNAL output_fast_out      : OUT STD_LOGIC;
+        SIGNAL output_addr_out      : OUT unsigned(sram_depth_c-1 DOWNTO 0);
+        SIGNAL output_precision_out : OUT unsigned(2 downto 0);
+        SIGNAL output_out           : OUT fp32_t;
+        SIGNAL output_C2_out        : OUT fp32_t
+    );
+END COMPONENT;
+
+COMPONENT falu2 IS
+    PORT (
+        SIGNAL clock_in             : IN STD_LOGIC;
+        SIGNAL reset_in             : IN STD_LOGIC;
+
+        SIGNAL step_in              : IN unsigned(sram_depth_c-1 DOWNTO 0);
+        SIGNAL opcode_in            : IN fpu_opcode_t;
+        SIGNAL input_ena_in         : IN STD_LOGIC;
+        SIGNAL input_eof_in         : IN STD_LOGIC;
+        SIGNAL input_last_in        : IN STD_LOGIC;
+        SIGNAL input_fast_in        : IN STD_LOGIC;
+        SIGNAL A_addr               : IN unsigned(sram_depth_c-1 DOWNTO 0);
+        SIGNAL A_precision          : IN unsigned(2 downto 0);
+        SIGNAL A_floor              : IN STD_LOGIC;
+        SIGNAL A_abs                : IN STD_LOGIC;
+        SIGNAL B_in                 : IN fp32_t;
+        SIGNAL C_in                 : IN fp32_t;
+        SIGNAL X_in                 : IN fp32_t;
+        SIGNAL Y_in                 : IN fp32_t;
+
+        SIGNAL output_ena_out       : OUT STD_LOGIC;
+        SIGNAL output_eof_out       : OUT STD_LOGIC;
+        SIGNAL output_last_out      : OUT STD_LOGIC;
+        SIGNAL output_fast_out      : OUT STD_LOGIC;
+        SIGNAL output_addr_out      : OUT unsigned(sram_depth_c-1 DOWNTO 0);
+        SIGNAL output_precision_out : OUT unsigned(2 downto 0);
+        SIGNAL output_out           : OUT fp32_t
+    );
+END COMPONENT;
+
+component fp2int is
+   generic
+   (
+      LATENCY:natural
+   );
+   port 
+   (
+      SIGNAL reset_in    : in std_logic;
+      SIGNAL clock_in    : in std_logic;
+      SIGNAL x_in        : in fp32_t;
+      SIGNAL y_out       : out std_logic_vector(31 downto 0)
+   );
+end component;
+
+component fpmax is
+    generic
+    (
+        LATENCY:natural
+    );
+    port(
+        SIGNAL clock_in : in std_logic;
+        SIGNAL reset_in : in std_logic;
+        SIGNAL x1_in    : in  fp32_t;
+        SIGNAL x2_in    : in  fp32_t;
+        SIGNAL y_out    : out fp32_t
+    );
+end component;
 
 COMPONENT ddr_tx IS
     port(
@@ -1572,6 +1889,122 @@ COMPONENT axi_write is
 	);
 end COMPONENT;
 
+component axi_resize_write is
+   generic (
+      MASTER_DATA_WIDTH  : integer:=128;
+      SLAVE_DATA_WIDTH   : integer:=32;
+      FIFO_DEPTH         : integer:=4;
+      FIFO_DATA_DEPTH    : integer:=4;
+      CCD                : boolean:=TRUE
+   );
+   port 
+   (
+      clock_in                    : in std_logic;
+      reset_in                    : in std_logic;
+
+      -- Slace port
+      axislave_clock_in           : IN std_logic;
+      axislave_awaddr_in          : IN axi_awaddr_t;
+      axislave_awlen_in           : IN axi_awlen_t;
+      axislave_awvalid_in         : IN axi_awvalid_t;
+      axislave_wvalid_in          : IN axi_wvalid_t;
+      axislave_wdata_in           : IN STD_LOGIC_VECTOR(SLAVE_DATA_WIDTH-1 downto 0);
+      axislave_wlast_in           : IN axi_wlast_t;
+      axislave_wstrb_in           : IN STD_LOGIC_VECTOR((SLAVE_DATA_WIDTH/8)-1 downto 0);
+      axislave_awready_out        : OUT axi_awready_t;
+      axislave_wready_out         : OUT axi_wready_t;
+      axislave_bresp_out          : OUT axi_bresp_t;
+      axislave_bid_out            : OUT axi_bid_t;
+      axislave_bvalid_out         : OUT axi_bvalid_t;
+      axislave_awburst_in         : IN axi_awburst_t;
+      axislave_awcache_in         : IN axi_awcache_t;
+      axislave_awid_in            : IN axi_awid_t;
+      axislave_awlock_in          : IN axi_awlock_t;
+      axislave_awprot_in          : IN axi_awprot_t;
+      axislave_awqos_in           : IN axi_awqos_t;
+      axislave_awsize_in          : IN axi_awsize_t;
+      axislave_bready_in          : IN axi_bready_t;
+      
+      -- Master port #1
+      aximaster_clock_in          : IN std_logic;
+      aximaster_awaddr_out        : OUT axi_awaddr_t;
+      aximaster_awlen_out         : OUT axi_awlen_t;
+      aximaster_awvalid_out       : OUT axi_awvalid_t;
+      aximaster_wvalid_out        : OUT axi_wvalid_t;
+      aximaster_wdata_out         : OUT STD_LOGIC_VECTOR(MASTER_DATA_WIDTH-1 downto 0);
+      aximaster_wlast_out         : OUT axi_wlast_t;
+      aximaster_wstrb_out         : OUT STD_LOGIC_VECTOR((MASTER_DATA_WIDTH/8)-1 downto 0);
+      aximaster_awready_in        : IN axi_awready_t;
+      aximaster_wready_in         : IN axi_wready_t;
+      aximaster_bresp_in          : IN axi_bresp_t;
+      aximaster_bid_in            : IN axi_bid_t;
+      aximaster_bvalid_in         : IN axi_bvalid_t;
+      aximaster_awburst_out       : OUT axi_awburst_t;
+      aximaster_awcache_out       : OUT axi_awcache_t;
+      aximaster_awid_out          : OUT axi_awid_t;
+      aximaster_awlock_out        : OUT axi_awlock_t;
+      aximaster_awprot_out        : OUT axi_awprot_t;
+      aximaster_awqos_out         : OUT axi_awqos_t;
+      aximaster_awsize_out        : OUT axi_awsize_t;
+      aximaster_bready_out        : OUT axi_bready_t
+   );
+end component;
+
+COMPONENT axi_resize_read is
+   generic (
+      SLAVE_DATA_WIDTH   : integer:=32;
+      MASTER_DATA_WIDTH  : integer:=128;
+      FIFO_DEPTH         : integer:=4;
+      FIFO_DATA_DEPTH    : integer:=4;
+      CCD                : boolean:=TRUE      
+   );
+   port 
+   (
+      clock_in               : in std_logic;
+      reset_in               : in std_logic;
+
+      -- Slace port
+      axislave_clock_in      : IN std_logic;
+      axislave_araddr_in     : IN axi_araddr_t;
+      axislave_arlen_in      : IN axi_arlen_t;
+      axislave_arvalid_in    : IN axi_arvalid_t;
+      axislave_arid_in       : IN axi_arid_t;
+      axislave_arlock_in     : IN axi_arlock_t;
+      axislave_arcache_in    : IN axi_arcache_t;
+      axislave_arprot_in     : IN axi_arprot_t;
+      axislave_arqos_in      : IN axi_arqos_t;
+      axislave_rid_out       : OUT axi_rid_t;         
+      axislave_rvalid_out    : OUT axi_rvalid_t;
+      axislave_rlast_out     : OUT axi_rlast_t;
+      axislave_rdata_out     : OUT STD_LOGIC_VECTOR(SLAVE_DATA_WIDTH-1 downto 0);
+      axislave_rresp_out     : OUT axi_rresp_t;
+      axislave_arready_out   : OUT axi_arready_t;
+      axislave_rready_in     : IN axi_rready_t;
+      axislave_arburst_in    : IN axi_arburst_t;
+      axislave_arsize_in     : IN axi_arsize_t;
+
+      -- Master port #1
+      aximaster_clock_in     : IN std_logic;
+      aximaster_araddr_out   : OUT axi_araddr_t;
+      aximaster_arlen_out    : OUT axi_arlen_t;
+      aximaster_arvalid_out  : OUT axi_arvalid_t;
+      aximaster_arid_out     : OUT axi_arid_t;
+      aximaster_arlock_out   : OUT axi_arlock_t;
+      aximaster_arcache_out  : OUT axi_arcache_t;
+      aximaster_arprot_out   : OUT axi_arprot_t;
+      aximaster_arqos_out    : OUT axi_arqos_t;
+      aximaster_rid_in       : IN axi_rid_t;
+      aximaster_rvalid_in    : IN axi_rvalid_t;
+      aximaster_rlast_in     : IN axi_rlast_t;
+      aximaster_rdata_in     : IN STD_LOGIC_VECTOR(MASTER_DATA_WIDTH-1 downto 0);
+      aximaster_rresp_in     : IN axi_rresp_t;
+      aximaster_arready_in   : IN axi_arready_t;
+      aximaster_rready_out   : OUT axi_rready_t;
+      aximaster_arburst_out  : OUT axi_arburst_t;
+      aximaster_arsize_out   : OUT axi_arsize_t
+   );
+end COMPONENT;
+
 constant MAX_SLAVE_PORT:integer:=3;
 
 COMPONENT axi_merge_read is
@@ -1587,7 +2020,6 @@ COMPONENT axi_merge_read is
         clock_in                : IN std_logic;
         reset_in                : IN std_logic;
 
-        axislavew_clock_in      : IN std_logic;
         axislavew_araddr_in     : IN axi_araddr_t:=(others=>'0');
         axislavew_arlen_in      : IN axi_arlen_t:=(others=>'0');
         axislavew_arvalid_in    : IN axi_arvalid_t:='0';     
@@ -1606,7 +2038,6 @@ COMPONENT axi_merge_read is
         axislavew_arburst_in    : IN axi_arburst_t:=(others=>'0');
         axislavew_arsize_in     : IN axi_arsize_t:=(others=>'0');
         
-        axislave_clocks_in      : IN std_logic_vector(MAX_SLAVE_PORT-1 downto 0);
         axislave_araddrs_in     : IN axi_araddrs_t(MAX_SLAVE_PORT-1 downto 0):=(others=>(others=>'0'));
         axislave_arlens_in      : IN axi_arlens_t(MAX_SLAVE_PORT-1 downto 0):=(others=>(others=>'0'));
         axislave_arvalids_in    : IN axi_arvalids_t(MAX_SLAVE_PORT-1 downto 0):=(others=>'0');     
@@ -1636,8 +2067,7 @@ COMPONENT axi_merge_read is
         aximaster_rid_in        : IN axi_rid_t;              
         aximaster_rvalid_in     : IN axi_rvalid_t;
         aximaster_rlast_in      : IN axi_rlast_t;
-        aximaster_rdata_in      : IN axi_rdata64_t;
-        aximaster_rdata_mask_out: OUT std_logic_vector(1 downto 0);
+        aximaster_rdata_in      : IN axi_rdata128_t;
         aximaster_rresp_in      : IN axi_rresp_t;
         aximaster_arready_in    : IN axi_arready_t;
         aximaster_rready_out    : OUT axi_rready_t;
@@ -1659,7 +2089,6 @@ component axi_merge_write is
         clock_in           : IN std_logic;
         reset_in           : IN std_logic;
         
-        axislavew_clock_in           : IN std_logic;
         axislavew_awaddr_in          : IN axi_awaddr_t;
         axislavew_awlen_in           : IN axi_awlen_t;
         axislavew_awvalid_in         : IN axi_awvalid_t;
@@ -1681,7 +2110,6 @@ component axi_merge_write is
         axislavew_awsize_in          : IN axi_awsize_t;
         axislavew_bready_in          : IN axi_bready_t;
         
-        axislave_clocks_in           : IN std_logic_vector(MAX_SLAVE_PORT-1 downto 0);
         axislave_awaddrs_in          : IN axi_awaddrs_t(MAX_SLAVE_PORT-1 downto 0);
         axislave_awlens_in           : IN axi_awlens_t(MAX_SLAVE_PORT-1 downto 0);
         axislave_awvalids_in         : IN axi_awvalids_t(MAX_SLAVE_PORT-1 downto 0);
@@ -1707,10 +2135,10 @@ component axi_merge_write is
         aximaster_awlen_out          : OUT axi_awlen_t;
         aximaster_awvalid_out        : OUT axi_awvalid_t;
         aximaster_wvalid_out         : OUT axi_wvalid_t;
-        aximaster_wdata_out          : OUT axi_wdata64_t;
+        aximaster_wdata_out          : OUT axi_wdata128_t;
         aximaster_wdata_mask_out     : OUT std_logic_vector(1 downto 0);
         aximaster_wlast_out          : OUT axi_wlast_t;
-        aximaster_wstrb_out          : OUT axi_wstrb8_t;
+        aximaster_wstrb_out          : OUT axi_wstrb16_t;
         aximaster_awready_in         : IN axi_awready_t;
         aximaster_wready_in          : IN axi_wready_t;
         aximaster_bresp_in           : IN axi_bresp_t;
@@ -1729,11 +2157,11 @@ end component;
 
 component axi_split_read is
    generic (
-      NUM_MASTER_PORT     : integer:=4;
-      NUM_MASTER_PORT_USED: integer:=4;
-      BAR_LO_BIT          : integer_array(3 downto 0);
-      BAR_HI_BIT          : integer_array(3 downto 0);
-      BAR                 : integer_array(3 downto 0)
+      NUM_MASTER_PORT     : integer:=5;
+      NUM_MASTER_PORT_USED: integer:=5;
+      BAR_LO_BIT          : integer_array(4 downto 0);
+      BAR_HI_BIT          : integer_array(4 downto 0);
+      BAR                 : integer_array(4 downto 0)
    );
    port 
    (
@@ -1782,11 +2210,11 @@ end component;
 
 component axi_split_write is
    generic (
-      NUM_MASTER_PORT     : integer:=4;
-      NUM_MASTER_PORT_USED: integer:=4;
-      BAR_LO_BIT          : integer_array(3 downto 0);
-      BAR_HI_BIT          : integer_array(3 downto 0);
-      BAR                 : integer_array(3 downto 0)
+      NUM_MASTER_PORT     : integer:=5;
+      NUM_MASTER_PORT_USED: integer:=5;
+      BAR_LO_BIT          : integer_array(4 downto 0);
+      BAR_HI_BIT          : integer_array(4 downto 0);
+      BAR                 : integer_array(4 downto 0)
    );
    port 
    (
@@ -1840,12 +2268,12 @@ end component;
 
 component axi_split is
    generic (
-      NUM_MASTER_PORT       : integer:=4;
-      NUM_MASTER_READ_PORT  : integer:=4;
-      NUM_MASTER_WRITE_PORT : integer:=4;
-      BAR_LO_BIT            : integer_array(3 downto 0);
-      BAR_HI_BIT            : integer_array(3 downto 0);
-      BAR                   : integer_array(3 downto 0)
+      NUM_MASTER_PORT       : integer:=5;
+      NUM_MASTER_READ_PORT  : integer:=5;
+      NUM_MASTER_WRITE_PORT : integer:=5;
+      BAR_LO_BIT            : integer_array(4 downto 0);
+      BAR_HI_BIT            : integer_array(4 downto 0);
+      BAR                   : integer_array(4 downto 0)
    );
    port 
    (
@@ -2050,7 +2478,47 @@ component axi_split is
       aximaster3_awprot_out  : OUT axi_awprot_t;
       aximaster3_awqos_out   : OUT axi_awqos_t;
       aximaster3_awsize_out  : OUT axi_awsize_t;
-      aximaster3_bready_out  : OUT axi_bready_t
+      aximaster3_bready_out  : OUT axi_bready_t;
+      
+      -- Master port #4
+      aximaster4_araddr_out  : OUT axi_araddr_t;
+      aximaster4_arlen_out   : OUT axi_arlen_t;
+      aximaster4_arvalid_out : OUT axi_arvalid_t;
+      aximaster4_arid_out    : OUT axi_arid_t;
+      aximaster4_arlock_out  : OUT axi_arlock_t;
+      aximaster4_arcache_out : OUT axi_arcache_t;
+      aximaster4_arprot_out  : OUT axi_arprot_t;
+      aximaster4_arqos_out   : OUT axi_arqos_t;
+      aximaster4_rid_in      : IN axi_rid_t:=(others=>'0');              
+      aximaster4_rvalid_in   : IN axi_rvalid_t:='0';
+      aximaster4_rlast_in    : IN axi_rlast_t:='0';
+      aximaster4_rdata_in    : IN axi_rdata_t:=(others=>'0');
+      aximaster4_rresp_in    : IN axi_rresp_t:=(others=>'0');
+      aximaster4_arready_in  : IN axi_arready_t:='0';
+      aximaster4_rready_out  : OUT axi_rready_t;
+      aximaster4_arburst_out : OUT axi_arburst_t;
+      aximaster4_arsize_out  : OUT axi_arsize_t;
+
+      aximaster4_awaddr_out  : OUT axi_awaddr_t;
+      aximaster4_awlen_out   : OUT axi_awlen_t;
+      aximaster4_awvalid_out : OUT axi_awvalid_t;
+      aximaster4_wvalid_out  : OUT axi_wvalid_t;
+      aximaster4_wdata_out   : OUT axi_wdata_t;
+      aximaster4_wlast_out   : OUT axi_wlast_t;
+      aximaster4_wstrb_out   : OUT axi_wstrb_t;
+      aximaster4_awready_in  : IN axi_awready_t:='0';
+      aximaster4_wready_in   : IN axi_wready_t:='0';
+      aximaster4_bresp_in    : IN axi_bresp_t:=(others=>'0');
+      aximaster4_bid_in      : IN axi_bid_t:=(others=>'0');
+      aximaster4_bvalid_in   : IN axi_bvalid_t:='0';
+      aximaster4_awburst_out : OUT axi_awburst_t;
+      aximaster4_awcache_out : OUT axi_awcache_t;
+      aximaster4_awid_out    : OUT axi_awid_t;
+      aximaster4_awlock_out  : OUT axi_awlock_t;
+      aximaster4_awprot_out  : OUT axi_awprot_t;
+      aximaster4_awqos_out   : OUT axi_awqos_t;
+      aximaster4_awsize_out  : OUT axi_awsize_t;
+      aximaster4_bready_out  : OUT axi_bready_t
    );
 end component;
 
@@ -2206,6 +2674,62 @@ component axi_stream_read is
 	);
 end component;
 
+component axi_ram_read is
+   generic(
+      RAM_DEPTH:integer;
+      RAM_LATENCY:integer
+   );
+   port(   
+      axislave_clock_in    :IN STD_LOGIC;
+      axislave_reset_in    :IN STD_LOGIC;
+      axislave_araddr_in   :IN STD_LOGIC_VECTOR(31 downto 0);
+      axislave_arburst_in  :IN STD_LOGIC_VECTOR(1 downto 0);
+      axislave_arlen_in    :IN STD_LOGIC_VECTOR(7 downto 0);
+      axislave_arready_out :OUT STD_LOGIC;
+      axislave_arsize_in   :IN STD_LOGIC_VECTOR(2 downto 0);
+      axislave_arvalid_in  :IN STD_LOGIC;
+      axislave_rdata_out   :OUT STD_LOGIC_VECTOR(31 downto 0);
+      axislave_rlast_out   :OUT STD_LOGIC;
+      axislave_rready_in   :IN STD_LOGIC;
+      axislave_rresp_out   :OUT STD_LOGIC_VECTOR(1 downto 0);
+      axislave_rvalid_out  :OUT STD_LOGIC;
+
+      ram_q_in             :IN std_logic_vector(31 downto 0);
+      ram_raddr_out        :OUT std_logic_vector(RAM_DEPTH-1 downto 0);
+      ram_read_out         :OUT std_logic
+   );
+end component;
+
+component axi_ram_write is
+   generic(
+      RAM_DEPTH:integer
+   );
+   port(   
+      axislave_clock_in     :IN STD_LOGIC;
+      axislave_reset_in     :IN STD_LOGIC;
+
+      axislave_awaddr_in    :IN STD_LOGIC_VECTOR(31 downto 0);
+      axislave_awburst_in   :IN STD_LOGIC_VECTOR(1 downto 0);
+      axislave_awlen_in     :IN STD_LOGIC_VECTOR(7 downto 0);
+      axislave_awready_out  :OUT STD_LOGIC;
+      axislave_awsize_in    :IN STD_LOGIC_VECTOR(2 downto 0);
+      axislave_awvalid_in   :IN STD_LOGIC;
+      axislave_bready_in    :IN STD_LOGIC;
+      axislave_bresp_out    :OUT STD_LOGIC_VECTOR(1 downto 0);
+      axislave_bvalid_out   :OUT STD_LOGIC;
+      axislave_wdata_in     :IN STD_LOGIC_VECTOR(31 downto 0);
+      axislave_wlast_in     :IN STD_LOGIC;
+      axislave_wready_out   :OUT STD_LOGIC;
+      axislave_wstrb_in     :IN STD_LOGIC_VECTOR(3 downto 0);
+      axislave_wvalid_in    :IN STD_LOGIC;
+
+      ram_waddr_out         :OUT std_logic_vector(RAM_DEPTH-3 downto 0);
+      ram_wdata_out         :OUT std_logic_vector(31 downto 0);
+      ram_wren_out          :OUT std_logic;
+      ram_be_out            :OUT std_logic_vector(3 downto 0)
+   );
+end component;
+
 component axi_merge is
     generic (
         R_FIFO_CMD_DEPTH     : integer_array(2 downto 0);
@@ -2219,10 +2743,10 @@ component axi_merge is
     );
 	port 
 	(
+        ddr_clock_in            : IN std_logic;
         clock_in                : IN std_logic;
         reset_in                : IN std_logic;
 
-        axislavew_clock_in      : IN std_logic;
         axislavew_araddr_in     : IN axi_araddr_t;
         axislavew_arlen_in      : IN axi_arlen_t;
         axislavew_arvalid_in    : IN axi_arvalid_t;     
@@ -2262,7 +2786,6 @@ component axi_merge is
         axislavew_awsize_in     : IN axi_awsize_t;
         axislavew_bready_in     : IN axi_bready_t;
         
-        axislave0_clock_in      : IN std_logic;
         axislave0_araddr_in     : IN axi_araddr_t;
         axislave0_arlen_in      : IN axi_arlen_t;
         axislave0_arvalid_in    : IN axi_arvalid_t;     
@@ -2302,7 +2825,6 @@ component axi_merge is
         axislave0_awsize_in     : IN axi_awsize_t;
         axislave0_bready_in     : IN axi_bready_t;
 
-        axislave1_clock_in      : IN std_logic;
         axislave1_araddr_in     : IN axi_araddr_t;
         axislave1_arlen_in      : IN axi_arlen_t;
         axislave1_arvalid_in    : IN axi_arvalid_t;     
@@ -2342,7 +2864,6 @@ component axi_merge is
         axislave1_awsize_in     : IN axi_awsize_t;
         axislave1_bready_in     : IN axi_bready_t;
         
-        axislave2_clock_in      : IN std_logic;
         axislave2_araddr_in     : IN axi_araddr_t;
         axislave2_arlen_in      : IN axi_arlen_t;
         axislave2_arvalid_in    : IN axi_arvalid_t;     
@@ -2382,46 +2903,45 @@ component axi_merge is
         axislave2_awsize_in         : IN axi_awsize_t;
         axislave2_bready_in         : IN axi_bready_t;
                         
-        aximaster_araddr_out    : OUT axi_araddr_t;
-        aximaster_arlen_out     : OUT axi_arlen_t;
-        aximaster_arvalid_out   : OUT axi_arvalid_t;
-        aximaster_arid_out      : OUT axi_arid_t;
-        aximaster_arlock_out    : OUT axi_arlock_t;
-        aximaster_arcache_out   : OUT axi_arcache_t;
-        aximaster_arprot_out    : OUT axi_arprot_t;
-        aximaster_arqos_out     : OUT axi_arqos_t;
-        aximaster_rid_in        : IN axi_rid_t;              
-        aximaster_rvalid_in     : IN axi_rvalid_t;
-        aximaster_rlast_in      : IN axi_rlast_t;
-        aximaster_rdata_in      : IN axi_rdata64_t;
-        aximaster_rdata_mask_out: OUT std_logic_vector(1 downto 0);
-        aximaster_rresp_in      : IN axi_rresp_t;
-        aximaster_arready_in    : IN axi_arready_t;
-        aximaster_rready_out    : OUT axi_rready_t;
-        aximaster_arburst_out   : OUT axi_arburst_t;
-        aximaster_arsize_out    : OUT axi_arsize_t;
+        ddr_araddr_out              : OUT axi_araddr_t;
+        ddr_arlen_out               : OUT axi_arlen_t;
+        ddr_arvalid_out             : OUT axi_arvalid_t;
+        ddr_arid_out                : OUT axi_arid_t;
+        ddr_arlock_out              : OUT axi_arlock_t;
+        ddr_arcache_out             : OUT axi_arcache_t;
+        ddr_arprot_out              : OUT axi_arprot_t;
+        ddr_arqos_out               : OUT axi_arqos_t;
+        ddr_rid_in                  : IN axi_rid_t;              
+        ddr_rvalid_in               : IN axi_rvalid_t;
+        ddr_rlast_in                : IN axi_rlast_t;
+        ddr_rdata_in                : IN axi_rdata128_t;
+        ddr_rresp_in                : IN axi_rresp_t;
+        ddr_arready_in              : IN axi_arready_t;
+        ddr_rready_out              : OUT axi_rready_t;
+        ddr_arburst_out             : OUT axi_arburst_t;
+        ddr_arsize_out              : OUT axi_arsize_t;
         
-        aximaster_awaddr_out    : OUT axi_awaddr_t;
-        aximaster_awlen_out     : OUT axi_awlen_t;
-        aximaster_awvalid_out   : OUT axi_awvalid_t;
-        aximaster_wvalid_out    : OUT axi_wvalid_t;
-        aximaster_wdata_out     : OUT axi_wdata64_t;
-        aximaster_wdata_mask_out: OUT std_logic_vector(1 downto 0);
-        aximaster_wlast_out     : OUT axi_wlast_t;
-        aximaster_wstrb_out     : OUT axi_wstrb8_t;
-        aximaster_awready_in    : IN axi_awready_t;
-        aximaster_wready_in     : IN axi_wready_t;
-        aximaster_bresp_in      : IN axi_bresp_t;
-        aximaster_bid_in        : IN axi_bid_t;
-        aximaster_bvalid_in     : IN axi_bvalid_t;
-        aximaster_awburst_out   : OUT axi_awburst_t;
-        aximaster_awcache_out   : OUT axi_awcache_t;
-        aximaster_awid_out      : OUT axi_awid_t;
-        aximaster_awlock_out    : OUT axi_awlock_t;
-        aximaster_awprot_out    : OUT axi_awprot_t;
-        aximaster_awqos_out     : OUT axi_awqos_t;
-        aximaster_awsize_out    : OUT axi_awsize_t;
-        aximaster_bready_out    : OUT axi_bready_t
+        ddr_awaddr_out              : OUT axi_awaddr_t;
+        ddr_awlen_out               : OUT axi_awlen_t;
+        ddr_awvalid_out             : OUT axi_awvalid_t;
+        ddr_wvalid_out              : OUT axi_wvalid_t;
+        ddr_wdata_out               : OUT axi_wdata128_t;
+        ddr_wdata_mask_out          : OUT std_logic_vector(1 downto 0);
+        ddr_wlast_out               : OUT axi_wlast_t;
+        ddr_wstrb_out               : OUT axi_wstrb16_t;
+        ddr_awready_in              : IN axi_awready_t;
+        ddr_wready_in               : IN axi_wready_t;
+        ddr_bresp_in                : IN axi_bresp_t;
+        ddr_bid_in                  : IN axi_bid_t;
+        ddr_bvalid_in               : IN axi_bvalid_t;
+        ddr_awburst_out             : OUT axi_awburst_t;
+        ddr_awcache_out             : OUT axi_awcache_t;
+        ddr_awid_out                : OUT axi_awid_t;
+        ddr_awlock_out              : OUT axi_awlock_t;
+        ddr_awprot_out              : OUT axi_awprot_t;
+        ddr_awqos_out               : OUT axi_awqos_t;
+        ddr_awsize_out              : OUT axi_awsize_t;
+        ddr_bready_out              : OUT axi_bready_t
 	);
 end component;
 
@@ -2710,7 +3230,13 @@ COMPONENT dp IS
 
         -- Indication
         SIGNAL indication_avail_out            : OUT STD_LOGIC;
-        
+
+        SIGNAL fpu_busy_vm_in                  : IN STD_LOGIC_VECTOR(1 DOWNTO 0);
+
+        SIGNAL fpu_exe_out                     : OUT STD_LOGIC;
+
+        SIGNAL fpu_exe_vm_out                  : OUT STD_LOGIC;
+
         SIGNAL ddr_tx_busy_in                  : IN STD_LOGIC
     );
 END COMPONENT;
@@ -2806,7 +3332,13 @@ COMPONENT dp_fetch IS
             SIGNAL pcore_read_pending_p1_in : STD_LOGIC_VECTOR(NUM_DP_DST_PORT-1 downto 0);
             SIGNAL sram_read_pending_p1_in  : STD_LOGIC_VECTOR(NUM_DP_DST_PORT-1 downto 0);
             SIGNAL ddr_read_pending_p1_in   : STD_LOGIC_VECTOR(NUM_DP_DST_PORT-1 downto 0);
-            
+
+            SIGNAL fpu_busy_vm_in           : IN STD_LOGIC_VECTOR(1 DOWNTO 0);
+
+            SIGNAL fpu_exe_out              : OUT STD_LOGIC;
+
+            SIGNAL fpu_exe_vm_out           : OUT STD_LOGIC;
+
             SIGNAL ddr_tx_busy_in           : IN STD_LOGIC
     );
 END COMPONENT;
@@ -3402,7 +3934,13 @@ COMPONENT dp_core IS
 
         -- Indication
         SIGNAL indication_avail_out         : OUT STD_LOGIC;
-        
+
+        SIGNAL fpu_busy_vm_in               : IN STD_LOGIC_VECTOR(1 DOWNTO 0);
+
+        SIGNAL fpu_exe_out                  : OUT STD_LOGIC;
+
+        SIGNAL fpu_exe_vm_out               : OUT STD_LOGIC;
+
         SIGNAL ddr_tx_busy_in               : IN STD_LOGIC
     );
 END COMPONENT;
@@ -3942,6 +4480,9 @@ COMPONENT mu_arbitrator IS
 END COMPONENT;
 
 COMPONENT alu IS
+    GENERIC(
+        INDEX:integer
+    );
     PORT
     (
         clock_in        : IN STD_LOGIC ;
@@ -4028,11 +4569,12 @@ COMPONENT scfifo is
 	);
 	port 
 	(
-		clock_in   : in std_logic;
+        clock_in   : in std_logic;
         reset_in   : in std_logic;
         data_in    : in std_logic_vector(DATA_WIDTH-1 downto 0);
         write_in   : in std_logic;
         read_in    : in std_logic;
+        flush_in   : in std_logic:='0';
         q_out      : out std_logic_vector(DATA_WIDTH-1 downto 0);
         ravail_out : out std_logic_vector(FIFO_DEPTH-1 downto 0);
         wused_out  : out std_logic_vector(FIFO_DEPTH-1 downto 0);
@@ -4201,25 +4743,6 @@ component delayi is
         SIGNAL in_in        :IN unsigned(SIZE-1 DOWNTO 0);
         SIGNAL out_out      :OUT unsigned(SIZE-1 DOWNTO 0);
         SIGNAL enable_in    :IN STD_LOGIC
-    );
-end component;
-
-component int2fp
-    PORT
-    (
-        clock        : IN STD_LOGIC ;
-        dataa        : IN STD_LOGIC_VECTOR (31 DOWNTO 0);
-        result       : OUT STD_LOGIC_VECTOR (31 DOWNTO 0)
-    );
-end component;
-
-component fp2int
-    PORT
-    (
-        clk_en       : IN STD_LOGIC ;
-        clock        : IN STD_LOGIC ;
-        dataa        : IN STD_LOGIC_VECTOR (31 DOWNTO 0);
-        result       : OUT STD_LOGIC_VECTOR (31 DOWNTO 0)
     );
 end component;
 
@@ -4466,7 +4989,16 @@ component soc_base is
         SIGNAL CAMERA_SDR   :OUT STD_LOGIC;
         SIGNAL CAMERA_RS    :IN STD_LOGIC;
         SIGNAL CAMERA_MCLK  :OUT STD_LOGIC;
-        SIGNAL CAMERA_PWDN  :OUT STD_LOGIC
+        SIGNAL CAMERA_PWDN  :OUT STD_LOGIC;
+
+        -- SPI signals
+
+        SIGNAL spi_ss       :OUT STD_LOGIC;
+        SIGNAL spi_sclk     :OUT STD_LOGIC;
+        SIGNAL spi_mosi     :OUT STD_LOGIC;
+        SIGNAL spi_cs_sd    :OUT STD_LOGIC;
+        SIGNAL spi_cs_esp32 :OUT STD_LOGIC;
+        SIGNAL spi_miso     :IN STD_LOGIC
     );
 end component;
 
@@ -4709,7 +5241,70 @@ component SHIFT_RIGHT_A IS
    );
 end component;
 
+component FP32_MUL is
+    generic
+    (
+        LATENCY:natural
+    );
+    port 
+    (
+        SIGNAL reset_in    : in std_logic;
+        SIGNAL clock_in    : in std_logic;
+        SIGNAL x1_in       : in fp32_t;
+        SIGNAL x2_in       : in fp32_t;
+        SIGNAL y_out       : out fp32_t
+    );
+end component;
+
+component FP32_ADDSUB is
+    generic
+    (
+        LATENCY:natural
+    );
+    port 
+    (
+        SIGNAL reset_in    : in std_logic;
+        SIGNAL clock_in    : in std_logic;
+        SIGNAL add_sub_in  : in std_logic;
+        SIGNAL x1_in       : in fp32_t;
+        SIGNAL x2_in       : in fp32_t;
+        SIGNAL y_out       : out fp32_t
+    );
+end component;
+
 --- For simulation ---
+
+component mem128 is
+   port(   
+      SDRAM_clk       :IN STD_LOGIC;
+      SDRAM_reset     :IN STD_LOGIC;
+      SDRAM_araddr    :IN STD_LOGIC_VECTOR(31 downto 0);
+      SDRAM_arburst   :IN STD_LOGIC_VECTOR(1 downto 0);
+      SDRAM_arlen     :IN STD_LOGIC_VECTOR(7 downto 0);
+      SDRAM_arready   :OUT STD_LOGIC;
+      SDRAM_arsize    :IN STD_LOGIC_VECTOR(2 downto 0);
+      SDRAM_arvalid   :IN STD_LOGIC;
+      SDRAM_awaddr    :IN STD_LOGIC_VECTOR(31 downto 0);
+      SDRAM_awburst   :IN STD_LOGIC_VECTOR(1 downto 0);
+      SDRAM_awlen     :IN STD_LOGIC_VECTOR(7 downto 0);
+      SDRAM_awready   :OUT STD_LOGIC;
+      SDRAM_awsize    :IN STD_LOGIC_VECTOR(2 downto 0);
+      SDRAM_awvalid   :IN STD_LOGIC;
+      SDRAM_bready    :IN STD_LOGIC;
+      SDRAM_bresp     :OUT STD_LOGIC_VECTOR(1 downto 0);
+      SDRAM_bvalid    :OUT STD_LOGIC;
+      SDRAM_rdata     :OUT STD_LOGIC_VECTOR(127 downto 0);
+      SDRAM_rlast     :OUT STD_LOGIC;
+      SDRAM_rready    :IN STD_LOGIC;
+      SDRAM_rresp     :OUT STD_LOGIC_VECTOR(1 downto 0);
+      SDRAM_rvalid    :OUT STD_LOGIC;
+      SDRAM_wdata     :IN STD_LOGIC_VECTOR(127 downto 0);
+      SDRAM_wlast     :IN STD_LOGIC;
+      SDRAM_wready    :OUT STD_LOGIC;
+      SDRAM_wstrb     :IN STD_LOGIC_VECTOR(15 downto 0);
+      SDRAM_wvalid    :IN STD_LOGIC
+   );
+end component;
 
 component mem64 is
    port(   
@@ -4863,11 +5458,125 @@ component gpio is
        signal apb_prdata            : OUT STD_LOGIC_VECTOR(31 downto 0);
        signal apb_pslverror         : OUT STD_LOGIC;
 
-       signal led_out               : out std_Logic_vector(3 downto 0);
-       signal button_in             : in std_logic_vector(3 downto 0)       
+       signal led_out               : out std_Logic_vector(15 downto 0);
+       signal button_in             : in std_logic_vector(15 downto 0)       
     );
 end component;
 
+COMPONENT fp12 IS
+    GENERIC (
+        INT_WIDTH     : integer -- Width of integer to be converted tp float 12bit
+    );
+    PORT(
+        SIGNAL clock_in    : IN STD_LOGIC;
+        SIGNAL reset_in    : IN STD_LOGIC;
+        SIGNAL input_in    : IN STD_LOGIC_VECTOR(INT_WIDTH-1 DOWNTO 0);
+        SIGNAL output_out  : OUT fp12_t
+    );
+END COMPONENT;
+
+COMPONENT fp_floor IS
+    generic
+    (
+        LATENCY : integer
+    );
+    port(
+        SIGNAL clock_in    : IN STD_LOGIC;
+        SIGNAL reset_in    : IN STD_LOGIC;
+        SIGNAL input_in    : IN fp32_t;
+        SIGNAL output_out  : OUT fp32_t
+    );
+END COMPONENT;
 
 END;
+
+--------------------------------------------------------------------
+-- Define some common utility function
+--------------------------------------------------------------------
+
+package body ztachip_pkg is
+    function float32_to_real(input_float: fp32_t) return real is
+        variable sign_bit      : std_logic;
+        variable exponent_bits : std_logic_vector(7 downto 0);
+        variable mantissa_bits : std_logic_vector(22 downto 0);
+        variable exponent      : integer;
+        variable mantissa      : real;
+        variable result        : real;
+    begin
+        -- Extract fields
+        if(input_float=std_logic_vector(to_unsigned(0,32))) then
+            return 0.0;
+        end if;
+        sign_bit      := input_float(31);
+        exponent_bits := input_float(30 downto 23);
+        mantissa_bits := input_float(22 downto 0);  
+        -- Convert exponent
+        exponent := to_integer(unsigned(exponent_bits)) - 127;  
+        -- Convert mantissa
+        mantissa := 1.0 + (real(to_integer(unsigned(mantissa_bits))) / (2.0 ** 23));
+        -- Compute final result
+        result := mantissa * (2.0 ** exponent);
+        -- Apply sign
+        if sign_bit = '1' then
+            result := -result;
+        end if; 
+        return result;
+    end function float32_to_real;
+
+    function real_to_float32(input_real: real) return fp32_t is
+        variable sign_bit      : std_logic;
+        variable exponent      : integer;
+        variable mantissa      : real;
+        variable mantissa_bits : std_logic_vector(22 downto 0);
+        variable exponent_bits : std_logic_vector(7 downto 0);
+        variable result        : std_logic_vector(31 downto 0);
+    begin
+        -- Handle zero case
+        if input_real = 0.0 then
+            return (others => '0');
+        end if;
+        -- Determine sign bit
+        if input_real < 0.0 then
+            sign_bit := '1';
+        else
+            sign_bit := '0';
+        end if;
+        -- Get absolute value
+        mantissa := abs(input_real);
+        -- Compute exponent
+        exponent := integer(log2(mantissa));
+        -- Normalize mantissa to be in range [1.0, 2.0)
+        mantissa := mantissa / (2.0 ** exponent);
+        if(mantissa >= 1.9999999) then
+            mantissa := mantissa/2.0;
+            exponent := exponent + 1;
+        end if;
+        if(mantissa <= 0.9999999) then
+            mantissa := 2.0 * mantissa;
+            exponent := exponent - 1;
+        end if;
+        -- Adjust exponent for IEEE 754 bias (127 bias)
+        exponent := exponent + 127;
+        -- Convert exponent to 8-bit std_logic_vector
+        exponent_bits := std_logic_vector(to_unsigned(exponent, 8));
+        -- Extract 23-bit mantissa (without leading 1)
+        mantissa := (mantissa - 1.0) * (2.0 ** 23);
+        mantissa_bits := std_logic_vector(to_unsigned(integer(mantissa), 23));
+        -- Assemble final result
+        result := sign_bit & exponent_bits & mantissa_bits;
+        return result;
+    end function real_to_float32;
+
+    function log2(n : natural) return natural is
+        variable result : natural := 0;
+        variable value  : natural := n;
+        begin
+            while value >= 2 loop
+                result := result + 1;
+                value  := value / 2;
+            end loop;
+            return result;
+    end function;
+
+end package body ztachip_pkg;
 

@@ -19,11 +19,15 @@
 #ifndef _ZTA_TYPES_H_
 #define _ZTA_TYPES_H_
 
+#include <stdint.h>
+
 typedef enum {
    ZtaStatusOk=0,
    ZtaStatusFail=-1,
    ZtaStatusBusy=1,
    ZtaStatusPending=2
 } ZtaStatus;
+
+typedef uint16_t float16_t;
 
 #endif

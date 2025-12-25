@@ -1,9 +1,26 @@
 PROJ_NAME=ztachip
+
+### Choose which test to run
+###
+### UNIT_TEST: Verify against some test vectors
+### LLM_TEST: run chat bot using smollm2-135M
+### VISION_TEST: run various vision tests
+###
+#######
+
+UNIT_TEST=no
+
+LLM_TEST=no
+
+VISION_TEST=yes
+
+
 #DEBUG=yes
 DEBUG=no
 BENCH=no
 MULDIV=yes
-UNIT_TEST?=no
+
+MAIN = src/main.cpp
 
 SRCS = 	base/newlib.c \
 	base/ztalib.c \
@@ -45,15 +62,23 @@ SRCS = 	base/newlib.c \
 	apps/nn/kernels/conv.m.c \
 	apps/nn/kernels/fcn.m.c \
 	apps/nn/kernels/objdet.m.c \
+	apps/llm/kernels/llm.m.c \
+	apps/llm/reference/llm_ref.c \
+	apps/llm/llm.cpp \
+	apps/llm/tokenizer.cpp \
+	apps/llm/gguf/gguf.cpp \
+	apps/llm/gguf/zuf.cpp \
 	apps/gdi/gdi.cpp \
 	apps/test/kernels/test.m.c \
-	src/soc.cpp \
-	src/main.cpp
+	thirdparty/FatFs/ff.c \
+	src/sdmm.c \
+	src/chat.cpp \
+	src/soc.cpp
 
 OBJDIR = build
 
 INC  =
-LIBS =
+LIBS = 
 LIBSINC = -L$(OBJDIR)
 LDSCRIPT = linker.ld
 
@@ -99,6 +124,14 @@ ifeq ($(UNIT_TEST),yes)
 	CFLAGS += -DZTACHIP_UNIT_TEST
 endif
 
+ifeq ($(LLM_TEST),yes)
+	CFLAGS += -DZTACHIP_LLM_TEST
+endif
+
+ifeq ($(VISION_TEST),yes)
+	CFLAGS += -DZTACHIP_VISION_TEST
+endif
+
 CFLAGS += -I./apps/nn/flatbuffer
 
 ifeq ($(SIFIVE_GCC_PACK),yes)
@@ -110,6 +143,7 @@ endif
 RISCV_OBJCOPY = $(RISCV_PATH)/bin/$(RISCV_NAME)-objcopy
 RISCV_OBJDUMP = $(RISCV_PATH)/bin/$(RISCV_NAME)-objdump
 RISCV_CC=$(RISCV_PATH)/bin/$(RISCV_NAME)-gcc
+RISCV_AR=$(RISCV_PATH)/bin/$(RISCV_NAME)-ar
 
 CFLAGS += -MD -fstrict-volatile-bitfields -fno-strict-aliasing
 LDFLAGS +=  -nostdlib -lgcc -lc -lm -lstdc++ -lgcc -lc -lgcc -mcmodel=medany -nostartfiles -ffreestanding -Wl,-Bstatic,-T,$(LDSCRIPT),-Map,$(OBJDIR)/$(PROJ_NAME).map,--print-memory-usage
@@ -121,10 +155,17 @@ OBJS := $(OBJS:.S=.o)
 OBJS := $(OBJS:..=miaou)
 OBJS := $(addprefix $(OBJDIR)/,$(OBJS))
 
+MAIN_OBJ := $(MAIN)
+MAIN_OBJ := $(MAIN_OBJ:.c=.o)
+MAIN_OBJ := $(MAIN_OBJ:.cpp=.o)
+MAIN_OBJ := $(addprefix $(OBJDIR)/,$(MAIN_OBJ))
 
-all: $(OBJDIR)/$(PROJ_NAME).elf $(OBJDIR)/$(PROJ_NAME).hex $(OBJDIR)/$(PROJ_NAME).asm $(OBJDIR)/$(PROJ_NAME).v
+all: $(OBJDIR)/$(PROJ_NAME).elf $(OBJDIR)/$(PROJ_NAME).hex $(OBJDIR)/$(PROJ_NAME).asm $(OBJDIR)/$(PROJ_NAME).v $(OBJDIR)/libzta.a
 
-$(OBJDIR)/%.elf: $(OBJS) | $(OBJDIR)
+$(OBJDIR)/libzta.a: $(OBJS) | $(OBJDIR)
+	$(RISCV_AR) rcs $@ $^
+
+$(OBJDIR)/%.elf: $(OBJS) $(MAIN_OBJ) | $(OBJDIR)
 	$(RISCV_CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBSINC) $(LIBS)
 
 %.hex: %.elf

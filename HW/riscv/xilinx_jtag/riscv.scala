@@ -13,6 +13,7 @@ import spinal.lib.misc.{InterruptCtrl, Prescaler, Timer}
 import spinal.lib.soc.pinsec.{PinsecTimerCtrl, PinsecTimerCtrlExternal}
 import vexriscv.plugin._
 import vexriscv.{VexRiscv, VexRiscvConfig, plugin}
+import vexriscv.ip.fpu.FpuParameter
 import spinal.lib.com.spi.ddr._
 import spinal.lib.bus.simple._
 import scala.collection.mutable.ArrayBuffer
@@ -79,7 +80,7 @@ object RiscvConfig{
         catchIllegalInstruction = true 
       ),
       new StaticMemoryTranslatorPlugin(
-        ioRange      = _(31 downto 31) === 0x1
+        ioRange      = x => x(31 downto 31) === 0x1 || x(31 downto 30) === 0x1
       ),
       new RegFilePlugin(
         regFileReadyKind = plugin.ASYNC,
@@ -217,6 +218,6 @@ case class riscv(config : RiscvConfig) extends Component{
 
 object riscv{
   def main(args: Array[String]) {
-    SpinalVhdl(riscv(RiscvConfig.default.copy()))
+    SpinalVerilog(riscv(RiscvConfig.default.copy()))
   }
 }

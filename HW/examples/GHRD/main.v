@@ -93,7 +93,14 @@ module main(
    inout          CAMERA_SDR,
    input          CAMERA_RS,
    output         CAMERA_MCLK,
-   output         CAMERA_PWDN      
+   output         CAMERA_PWDN ,
+
+   output         spi_ss,
+   output         spi_sclk,
+   output         spi_mosi,
+   output         spi_cs_sd,
+   output         spi_cs_esp32,
+   input          spi_miso 
    );
    
    wire               SDRAM_clk;
@@ -120,9 +127,9 @@ module main(
    wire               SDRAM_wready;
    wire               SDRAM_wvalid;
 
-   wire [64-1:0] SDRAM_rdata;
-   wire [64-1:0] SDRAM_wdata;
-   wire [64/8-1:0] SDRAM_wstrb;
+   wire [128-1:0] SDRAM_rdata;
+   wire [128-1:0] SDRAM_wdata;
+   wire [128/8-1:0] SDRAM_wstrb;
       
    wire [31:0]        VIDEO_tdata;
    wire               VIDEO_tlast;
@@ -206,7 +213,14 @@ module main(
       .CAMERA_SDR(CAMERA_SDR),
       .CAMERA_RS(CAMERA_RS),
       .CAMERA_MCLK(CAMERA_MCLK),
-      .CAMERA_PWDN(CAMERA_PWDN)
+      .CAMERA_PWDN(CAMERA_PWDN),
+   
+      .spi_ss(spi_ss),
+      .spi_sclk(spi_sclk),
+      .spi_mosi(spi_mosi),
+      .spi_cs_sd(spi_cs_sd),
+      .spi_cs_esp32(spi_cs_esp32),
+      .spi_miso(spi_miso)
    );
 
    //---------------------------

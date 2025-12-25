@@ -16,8 +16,8 @@
 // limitations under the License.
 //------------------------------------------------------------------------------
 
-#ifndef _CONFIG_H_
-#define _CONFIG_H_
+#ifndef _COMPILER_CONFIG_H_
+#define _COMPILER_CONFIG_H_
 
 #include "util.h"
 
@@ -142,9 +142,9 @@ public:
    OPCODE_CMP_EQ=10,
    OPCODE_CMP_NE=11,
    OPCODE_MUL=12,
-   OPCODE_GET_MANTISSA=15,
-   OPCODE_GET_EXPONENT=16,
-   OPCODE_SET_EXPONENT=17,
+   OPCODE_LSB4=15,
+   OPCODE_MSB4=16,
+   OPCODE_CONV_BFLOAT=17,
    OPCODE_SET_FLOAT=18,
    OPCODE_SHL=19,
    OPCODE_SHLA=20,

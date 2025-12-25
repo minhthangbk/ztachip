@@ -29,11 +29,11 @@ use work.ztachip_pkg.all;
 
 entity axi_split_read is
    generic (
-      NUM_MASTER_PORT     : integer:=4;
-      NUM_MASTER_PORT_USED: integer:=4;
-      BAR_LO_BIT          : integer_array(3 downto 0);
-      BAR_HI_BIT          : integer_array(3 downto 0);
-      BAR                 : integer_array(3 downto 0)
+      NUM_MASTER_PORT     : integer:=5;
+      NUM_MASTER_PORT_USED: integer:=5;
+      BAR_LO_BIT          : integer_array(4 downto 0);
+      BAR_HI_BIT          : integer_array(4 downto 0);
+      BAR                 : integer_array(4 downto 0)
    );
    port 
    (
@@ -137,6 +137,7 @@ constant M0:integer:=0;
 constant M1:integer:=1;
 constant M2:integer:=2;
 constant M3:integer:=3;
+constant M4:integer:=4;
 
 begin
 
@@ -277,6 +278,12 @@ elsif(axislave_arvalid='1') then
       pending_write_rec(M3) <= '1';
       pending_write <= aximaster_arreadys_in(M3);
       arready <= aximaster_arreadys_in(M3);
+   elsif((M4 < NUM_MASTER_PORT_USED) and
+      axislave_araddr(BAR_HI_BIT(M4) downto BAR_LO_BIT(M4))=std_logic_vector(to_unsigned(BAR(M4),BAR_HI_BIT(M4)-BAR_LO_BIT(M4)+1))) then 
+      aximaster_arvalids(M4) <= '1';
+      pending_write_rec(M4) <= '1';
+      pending_write <= aximaster_arreadys_in(M4);
+      arready <= aximaster_arreadys_in(M4);
    end if;
 end if;
 
@@ -320,6 +327,14 @@ elsif((M3 < NUM_MASTER_PORT_USED) and
    rdata <= aximaster_rdatas_in(M3);
    rresp <= aximaster_rresps_in(M3);
    aximaster_rreadys(M3) <= rready;
+elsif((M4 < NUM_MASTER_PORT_USED) and
+   pending_read_empty='0' and pending_read_rec(M4)='1') then
+   rid <= aximaster_rids_in(M4);      
+   rvalid <= aximaster_rvalids_in(M4);
+   rlast <= aximaster_rlasts_in(M4);
+   rdata <= aximaster_rdatas_in(M4);
+   rresp <= aximaster_rresps_in(M4);
+   aximaster_rreadys(M4) <= rready;
 end if;
 
 -- Route common slave signals to all master ports

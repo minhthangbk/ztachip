@@ -12,7 +12,7 @@ CFLAGS= \
 -I.
 
 OBJ = ast.o class.o const.o gen.o graph.o ident.o \
-instruction.o mcore.o prune.o term.o util.o config.o main.o \
+instruction.o mcore.o mcore2.o prune.o term.o util.o config.o main.o \
 lex.yy.o Parser.tab.o
 
 lex.yy.c : Lexer.l
