@@ -37,8 +37,6 @@ LIBRARY ieee;
 USE ieee.std_logic_1164.all;
 use IEEE.numeric_std.all;
 use work.ztachip_pkg.all;
-LIBRARY altera_mf;
-USE altera_mf.all;
 
 ENTITY falu_core IS
     PORT (

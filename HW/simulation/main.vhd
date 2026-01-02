@@ -74,6 +74,7 @@ signal clk_main:std_logic;
 signal clk_r:std_logic:='0';
 signal reset_r:std_logic_vector(3 downto 0):=(others=>'0');
 signal reset:std_logic;
+
 begin
 
 --Generate clocks

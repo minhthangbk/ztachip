@@ -1,10 +1,16 @@
 PROJ_NAME=ztachip
 
-### Choose which test to run
+#########################################################
+###
+### Choose which test to run 
+###
+### Set to yes for one of the option below, and no to others
 ###
 ### UNIT_TEST: Verify against some test vectors
+###
 ### LLM_TEST: run chat bot using smollm2-135M
-### VISION_TEST: run various vision tests
+###
+### VISION_TEST: run various vision tests with
 ###
 #######
 
@@ -14,6 +20,7 @@ LLM_TEST=no
 
 VISION_TEST=yes
 
+########################################################
 
 #DEBUG=yes
 DEBUG=no

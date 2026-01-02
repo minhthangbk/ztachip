@@ -53,7 +53,7 @@ architecture rtl of afifo is
 
 -- Declare the RAM signal.	
 signal q:std_logic_vector(DATA_WIDTH-1 downto 0);
-signal raddr:std_logic_vector(FIFO_DEPTH-1 downto 0);
+signal raddr:std_logic_vector(FIFO_DEPTH downto 0);
 signal waddr_gray_r:std_logic_vector(FIFO_DEPTH downto 0);
 signal raddr_gray_r:std_logic_vector(FIFO_DEPTH downto 0);
 signal waddr_binary_r:std_logic_vector(FIFO_DEPTH downto 0);
@@ -64,7 +64,9 @@ signal raddr_binary_next:std_logic_vector(FIFO_DEPTH downto 0);
 signal raddr_binary_prev:std_logic_vector(FIFO_DEPTH downto 0);
 signal waddr_binary_next:std_logic_vector(FIFO_DEPTH downto 0);
 signal raddr_gray_sync:std_logic_vector(FIFO_DEPTH downto 0);
+signal raddr_gray_sync_r:std_logic_vector(FIFO_DEPTH downto 0);
 signal waddr_gray_sync:std_logic_vector(FIFO_DEPTH downto 0);
+signal waddr_gray_sync_r:std_logic_vector(FIFO_DEPTH downto 0);
 signal wready_r:std_logic;
 signal full_r:std_logic;
 signal avail_r:std_logic;
@@ -96,7 +98,7 @@ waddr_binary_next <= std_logic_vector(unsigned(waddr_binary_r)+1);
 
 waddr_gray_next <= bin2gray(waddr_binary_next);
 
-raddr <= raddr_binary_r(FIFO_DEPTH-1 downto 0) when (read_in='0') else raddr_binary_next(FIFO_DEPTH-1 downto 0);
+raddr <= raddr_binary_r(FIFO_DEPTH downto 0) when (read_in='0') else raddr_binary_next(FIFO_DEPTH downto 0);
 
 ram_i : DPRAM_DUAL_CLOCK
    generic map
@@ -111,7 +113,7 @@ ram_i : DPRAM_DUAL_CLOCK
    port map
        (
         address_a => waddr_binary_r(FIFO_DEPTH-1 downto 0),
-        address_b => raddr,
+        address_b => raddr(FIFO_DEPTH-1 downto 0),
         clock_a => wclock_in,
         clock_b => rclock_in,
         data_a => data_in,
@@ -158,22 +160,24 @@ begin
       raddr_gray_r <= (others=>'0');
       raddr_binary_r <= (others=>'0');
       avail_r <= '0';
+      waddr_gray_sync_r <= (others=>'0');
    else
       if(rising_edge(rclock_in)) then 
+         waddr_gray_sync_r <= waddr_gray_sync;
          if read_in='1' then
             raddr_gray_r <= raddr_gray_next;
             raddr_binary_r <= raddr_binary_next;
-            if((raddr_gray_next(FIFO_DEPTH)=waddr_gray_sync(FIFO_DEPTH)) and
-               (raddr_gray_next(FIFO_DEPTH-2 downto 0)=waddr_gray_sync(FIFO_DEPTH-2 downto 0)) and
-               ((raddr_gray_next(FIFO_DEPTH) xor raddr_gray_next(FIFO_DEPTH-1))=(waddr_gray_sync(FIFO_DEPTH) xor waddr_gray_sync(FIFO_DEPTH-1)))) then
+            if((raddr_gray_next(FIFO_DEPTH)=waddr_gray_sync_r(FIFO_DEPTH)) and
+               (raddr_gray_next(FIFO_DEPTH-2 downto 0)=waddr_gray_sync_r(FIFO_DEPTH-2 downto 0)) and
+               ((raddr_gray_next(FIFO_DEPTH) xor raddr_gray_next(FIFO_DEPTH-1))=(waddr_gray_sync_r(FIFO_DEPTH) xor waddr_gray_sync_r(FIFO_DEPTH-1)))) then
                avail_r <= '0';
             else
                avail_r <= '1';
             end if;
          else
-            if((raddr_gray_r(FIFO_DEPTH)=waddr_gray_sync(FIFO_DEPTH)) and
-               (raddr_gray_r(FIFO_DEPTH-2 downto 0)=waddr_gray_sync(FIFO_DEPTH-2 downto 0)) and
-               ((raddr_gray_r(FIFO_DEPTH) xor raddr_gray_r(FIFO_DEPTH-1))=(waddr_gray_sync(FIFO_DEPTH) xor waddr_gray_sync(FIFO_DEPTH-1)))) then
+            if((raddr_gray_r(FIFO_DEPTH)=waddr_gray_sync_r(FIFO_DEPTH)) and
+               (raddr_gray_r(FIFO_DEPTH-2 downto 0)=waddr_gray_sync_r(FIFO_DEPTH-2 downto 0)) and
+               ((raddr_gray_r(FIFO_DEPTH) xor raddr_gray_r(FIFO_DEPTH-1))=(waddr_gray_sync_r(FIFO_DEPTH) xor waddr_gray_sync_r(FIFO_DEPTH-1)))) then
                avail_r <= '0';
             else
                avail_r <= '1';
@@ -192,23 +196,25 @@ begin
       waddr_binary_r <= (others=>'0');
       wready_r <= '0';
       full_r <= '0';
+      raddr_gray_sync_r <= (others=>'0');
    else
       if(rising_edge(wclock_in)) then
          wready_r <= '1'; 
+         raddr_gray_sync_r <= raddr_gray_sync;
          if(write_in = '1') then
             waddr_gray_r <= waddr_gray_next;
             waddr_binary_r <= waddr_binary_next;
-            if((raddr_gray_sync(FIFO_DEPTH)/=waddr_gray_next(FIFO_DEPTH)) and
-               (raddr_gray_sync(FIFO_DEPTH-2 downto 0)= waddr_gray_next(FIFO_DEPTH-2 downto 0)) and
-               ((raddr_gray_sync(FIFO_DEPTH) xor raddr_gray_sync(FIFO_DEPTH-1))=(waddr_gray_next(FIFO_DEPTH) xor waddr_gray_next(FIFO_DEPTH-1)))) then
+            if((raddr_gray_sync_r(FIFO_DEPTH)/=waddr_gray_next(FIFO_DEPTH)) and
+               (raddr_gray_sync_r(FIFO_DEPTH-2 downto 0)= waddr_gray_next(FIFO_DEPTH-2 downto 0)) and
+               ((raddr_gray_sync_r(FIFO_DEPTH) xor raddr_gray_sync_r(FIFO_DEPTH-1))=(waddr_gray_next(FIFO_DEPTH) xor waddr_gray_next(FIFO_DEPTH-1)))) then
                full_r <= '1';
             else
                full_r <= '0';
             end if;
          else
-            if((raddr_gray_sync(FIFO_DEPTH)/=waddr_gray_r(FIFO_DEPTH)) and
-               (raddr_gray_sync(FIFO_DEPTH-2 downto 0)= waddr_gray_r(FIFO_DEPTH-2 downto 0)) and
-               ((raddr_gray_sync(FIFO_DEPTH) xor raddr_gray_sync(FIFO_DEPTH-1))=(waddr_gray_r(FIFO_DEPTH) xor waddr_gray_r(FIFO_DEPTH-1)))) then
+            if((raddr_gray_sync_r(FIFO_DEPTH)/=waddr_gray_r(FIFO_DEPTH)) and
+               (raddr_gray_sync_r(FIFO_DEPTH-2 downto 0)= waddr_gray_r(FIFO_DEPTH-2 downto 0)) and
+               ((raddr_gray_sync_r(FIFO_DEPTH) xor raddr_gray_sync_r(FIFO_DEPTH-1))=(waddr_gray_r(FIFO_DEPTH) xor waddr_gray_r(FIFO_DEPTH-1)))) then
                full_r <= '1';
             else
                full_r <= '0';

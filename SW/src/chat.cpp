@@ -85,6 +85,7 @@ int chat() {
 #endif
 #endif
 
+    printf("\r\n Load model. Please wait...\r\n");
 #if 1
 #ifdef __WIN32__
 //      ai.Open("c:\\Users\\vuong\\VM\\ztachip\\SW\\gguf\\SMOLLM2.ZUF");
