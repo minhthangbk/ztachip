@@ -1527,7 +1527,7 @@ void kernel_llm_done()
 {
    static uint32_t reqid=1000;
    uint32_t resp;
-   > WAIT_FPU;
+//   > WAIT_FPU;
    ztaJobDone(reqid); 
    for(;;) {
       if(ztaReadResponse(&resp) && resp==reqid)

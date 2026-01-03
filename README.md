@@ -82,14 +82,10 @@ In `HW/platform`, a generic implementation is also provided for simulation envir
 
 Also, in `SW/apps`, many prebuilt acceleration functions are provided to provide programmers with a fast path to leverage ztachip acceleration. This folder is also a good place to learn on how to program your own custom acceleration functions.
 
-# Build procedure
+# SW build procedure
 
-The build procedure produces 2 seperate images.
-
-One image is a standalone executable where user applications are using ztachip using a native [C/C++ library interface] (https://github.com/ztachip/ztachip/raw/master/Documentation/visionai_programmer_guide.pdf)
-
-The second image is a micropython port of ztachip. With this image, applications are using ztachip using a [Python programming interface](micropython/MicropythonUserGuide.md)
-
+There are several demos available which demonstrate various capabilities of ztchip.
+Choose to build one of the 3 demos described below.
 
 ## Prerequisites (Ubuntu)
 
@@ -115,7 +111,11 @@ sudo make
 git clone https://github.com/ztachip/ztachip.git
 ```
 
-## Build ztachip as standalone image
+## Build procedure for demo #1 - AI+Vision
+This demo demonstrates many vision and AI capabilities using a native [C/C++ library interface] (https://github.com/ztachip/ztachip/raw/master/Documentation/visionai_programmer_guide.pdf)
+
+This demo is shown in this [video](https://www.youtube.com/watch?v=amubm828YGs)
+
 ```
 export PATH=/opt/riscv/bin:$PATH
 cd ztachip
@@ -124,14 +124,18 @@ make clean all
 cd ../fs
 python3 bin2c.py
 cd ..
+make clean all -f makefile.quant
 make clean all -f makefile.kernels
 make clean all
 ```
 
-## Build ztachip as micropython port
-You are required to complete the previous build procedure for standalone image even if your
-target image is micropython image. 
-Below is procedure to build micropython image after you have completed the standalone image build procedure.
+## Build procedure for demo #2 - AI+Vision+Micropython
+This example is similar to example 1 except that the program is using a [Python programming interface](micropython/MicropythonUserGuide.md)
+
+This demo is shown in this [video](https://www.youtube.com/watch?v=nLGmmw7-PYs)
+
+You are required to complete first the build procedure for demo #1 above.
+Then follow with a micropython build below.
 
 ```
 git clone https://github.com/micropython/micropython.git
@@ -144,14 +148,50 @@ make clean
 make
 ```
 
-## Build FPGA
+## Build procedure for demo #3 - LLM chatbot 
+This demo demonstrates a LLM chatbot running SmolLM2 model. SmolLM2 is based LLAMA architecture but trained by HuggingFace team.
+
+Update the following variable in SW/makefile
+```
+LLM_TEST=yes
+```
+Then proceed with similar build procedure of demo #1.
+
+### Quantizing LLM model required by demo #3
+
+Demo #3 requires a quantized LLM model to be prepared. Follow the steps below.
+
+- Download SmolLM2-135M-Instruct from HuggingFace
+
+```
+git clone git@hf.co:HuggingFaceTB/SmolLM2-135M-Instruct
+```
+
+- Install [llama.cpp](https://github.com/ggml-org/llama.cpp)
+
+- From llama.cpp installation, convert the downloaded model to GGUF format (FP32). GGUF format is the LLM format used by the popular Ollama inferencing engine.
+
+```
+cd <llama_cpp-install-folder>
+python convert_hf_to_gguf.py <model-download-folder>/SmolLM2-135M-Instruct --outfile SmolLM2-135M-Instruct.gguf --outtype f32
+```
+
+- Quantize the model to ztachip ZUF format.
+
+```
+<ztachip-folder>/SW/build/quant ZTA Q4 SmolLM2-135M-Instruct.gguf SMOLLM2.ZUF
+```
+
+- Copy SMOLLM2.ZUF to a Micro-SSD card and plug the card to Micro-SSD card slot of the dev-kit.
+
+# FPGA build procedure
 
 - Download Xilinx Vivado Webpack free edition.
 
 - Create the project file, build FPGA image and program it to flash as described in
 [FPGA build procedure](Documentation/Vivado.md)
 
-# Run reference design example
+# Running the demos.
 
 The following demos are demonstrated on the [ArtyA7-100T FPGA development board](https://digilent.com/shop/arty-a7-artix-7-fpga-development-board/).
 
@@ -179,6 +219,8 @@ Reference design example required the hardware components below...
 - [VGA module](https://digilent.com/shop/pmod-vga-video-graphics-array/)
 
 - [Camera module](https://www.amazon.ca/640X480-Interface-Exposure-Control-Display/dp/B07PX4N3YS/ref=sr_1_2_sspa?gclid=EAIaIQobChMIttra8bjo-QIVCMqzCh27tA5XEAAYASAAEgKJTPD_BwE&hvadid=596026577980&hvdev=c&hvlocphy=9000555&hvnetw=g&hvqmt=e&hvrand=6338354247560979516&hvtargid=kwd-296249713094&hydadcr=13589_13421122&keywords=ov7670+camera+module&qid=1661652319&sr=8-2-spons&psc=1&spLa=ZW5jcnlwdGVkUXVhbGlmaWVyPUEzVDhCRUlYWEJZUU8xJmVuY3J5cHRlZElkPUEwMDExNDE5M1ZRSEw3WDdEWk9VWiZlbmNyeXB0ZWRBZElkPUEwMTgwOTYwWTFXWUNPWE8xQzk2JndpZGdldE5hbWU9c3BfYXRmJmFjdGlvbj1jbGlja1JlZGlyZWN0JmRvTm90TG9nQ2xpY2s9dHJ1ZQ==)
+
+- [Wifi+MicroSD](https://www.adafruit.com/product/4285)
 
 Attach the VGA and Camera modules to Arty-A7 board according to picture below 
 
@@ -228,7 +270,7 @@ sudo src/openocd -f usb_connect.cfg -c 'set MURAX_CPU0_YAML cpu0.yaml' -f soc_in
 
 ## Uploading SW image via GDB debugger
 
-### Upload procedure for standalone SW image option
+### Upload procedure for demo#1 and demo#3 (without micro-python)
 Open another terminal, then issue commands below to upload the standalone image
 
 ```
@@ -237,7 +279,7 @@ cd <ztachip installation folder>/SW/src
 riscv32-unknown-elf-gdb ../build/ztachip.elf
 ```
 
-### Upload procedure for micropython SW image option
+### Upload procedure for demo#2 (micro-python)
 Open another terminal, then issue commands below to upload the micropython image.
 
 ```
@@ -268,14 +310,20 @@ After sucessfully loading the program, issue command below at GDB prompt
 continue
 ```
 
-### Running standalone image
-If you are running the standalone image, press button0 to switch between different AI/vision applications. The sample application running is implemented in [vision_ai.cpp](SW/src/vision_ai.cpp)
+### Running demo #1
+If you are running demo #1, press button0 to switch between different AI/vision applications. The sample application running is implemented in [vision_ai.cpp](SW/src/vision_ai.cpp)
 
-### Running micropython image
+### Running demo #2
 If you are running the micropython image, Micropython allows for entering python code in paste mode at the serial port.  
 To use the paste mode, hit Ctrl+E then paste one of the [examples](micropython/examples/) to the serial port, then hit ctrl+D to execute the python code.
 
 Hit any button to return back to Micropython prompt.
+
+### Running demo #3
+After LLM model has been loaded from SSD card, you will be presented with a prompt on the serial port.
+Enter a questions then hit enter.
+There will be a response from LLM model.
+Hit Ctrl-C to break the response.
 
 # How to port ztachip to other FPGA,ASIC and SOC 
 

@@ -18,7 +18,6 @@ UNIT_TEST=no
 
 LLM_TEST=no
 
-VISION_TEST=yes
 
 ########################################################
 
@@ -133,10 +132,6 @@ endif
 
 ifeq ($(LLM_TEST),yes)
 	CFLAGS += -DZTACHIP_LLM_TEST
-endif
-
-ifeq ($(VISION_TEST),yes)
-	CFLAGS += -DZTACHIP_VISION_TEST
 endif
 
 CFLAGS += -I./apps/nn/flatbuffer

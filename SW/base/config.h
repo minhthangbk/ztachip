@@ -31,9 +31,9 @@
 //    8 for large version
 //--------------------------------------------------------------
 
-//#define NUM_PCORE 4  
+#define NUM_PCORE 4  
 
-#define NUM_PCORE 8  
+//#define NUM_PCORE 8  
 
 //---------------------------------------------------------------
 // Max tensor size in log2
@@ -41,7 +41,9 @@
 // This must match MAX_TENSOR_LOG2_SIZE defined in config.vhd
 //---------------------------------------------------------------
 
-#define MAX_TENSOR_LOG2_SIZE  24 
+#define MAX_TENSOR_LOG2_SIZE  26
+
+//#define MAX_TENSOR_LOG2_SIZE  24 
 
 //#define MAX_TENSOR_LOG2_SIZE  28 
 
@@ -50,8 +52,8 @@
 // This must match fpu_enabled_c defined on config.vhd
 //----------------------------------------------------------------
  
-//#define FPU_ENABLED TRUE
+#define FPU_ENABLED TRUE
 
-#define FPU_ENABLED FALSE
+//#define FPU_ENABLED FALSE
 
 #endif

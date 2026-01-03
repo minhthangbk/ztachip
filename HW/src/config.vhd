@@ -16,10 +16,10 @@ package config is
 -------------------------------------------------------------
 
 --LARGE VERSION
-constant pid_gen_max_c: integer:=8;
+--constant pid_gen_max_c: integer:=8;
 
 --SMALL VERSION
---constant pid_gen_max_c: integer:=4;
+constant pid_gen_max_c: integer:=4;
 
 -----------------------------------------------------------------
 -- Memory usage optimization
@@ -60,9 +60,9 @@ constant main_clock_c:integer:=125000000;
 -- Enable/disable FPU. This option is required to run LLM models
 ----------------------------------------------------------------
  
---constant fpu_enabled_c:boolean:=TRUE;
+constant fpu_enabled_c:boolean:=TRUE;
 
-constant fpu_enabled_c:boolean:=FALSE;
+--constant fpu_enabled_c:boolean:=FALSE;
 
 ---------------------------------------------------------------
 -- Max tensor size in log2
@@ -71,6 +71,8 @@ constant fpu_enabled_c:boolean:=FALSE;
 
 --constant MAX_TENSOR_LOG2_SIZE: integer:=28;
 
-constant MAX_TENSOR_LOG2_SIZE: integer:=24;
+--constant MAX_TENSOR_LOG2_SIZE: integer:=24;
+
+constant MAX_TENSOR_LOG2_SIZE: integer:=26;
 
 end;

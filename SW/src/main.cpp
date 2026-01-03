@@ -47,7 +47,6 @@ int main() {
    }
 #endif
 
-#ifdef ZTACHIP_VISION_TEST
    // Run various vision tests
    //   - object detection
    //   - image classfication
@@ -59,8 +58,7 @@ int main() {
    for(;;) {
       vision_ai();
    }
-#endif
-    return 0;
+   return 0;
 }
 
 void irqCallback() {

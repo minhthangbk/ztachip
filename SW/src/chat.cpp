@@ -85,10 +85,10 @@ int chat() {
 #endif
 #endif
 
-    printf("\r\n Load model. Please wait...\r\n");
+    printf("\r\n Loading model from SD card \r\n");
+    printf("\r\n Loading is slow since SPI driver for SD card is not hardware based yet.\r\n");
 #if 1
 #ifdef __WIN32__
-//      ai.Open("c:\\Users\\vuong\\VM\\ztachip\\SW\\gguf\\SMOLLM2.ZUF");
       ai.Open("c:\\Users\\vuong\\VM\\ztachip\\SW\\gguf\\xxx.ZUF");
 #else
       ai.Open("SMOLLM2.ZUF");
@@ -103,7 +103,6 @@ int chat() {
         ai.Clear();
 
         output.clear();
-//        ai.UserPrompt((char*)"What is the capital of Egypt",&output);
         ai.UserPrompt((char*)"Who is Issac Newton", &output);
 
         if(i==0)
@@ -114,18 +113,6 @@ int chat() {
         else {
             goodCount++;
         }
-#if 0
-        output.clear();
-        ai.UserPrompt((char*)"And of USA?", &output);
-        if (i == 0)
-            output_ref_1 = output;
-        if (output_ref_1 != output) {
-            failCount++;
-        }
-        else {
-            goodCount++;
-        }
-#endif
         printf("\r\n--> SUCESS fail=%d good=%d \r\n",failCount,goodCount);
     }
     ai.Close();

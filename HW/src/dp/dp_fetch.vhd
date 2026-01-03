@@ -1660,8 +1660,6 @@ FOR I in 0 to 1 loop
 if valids(I)='1' then
     if indication_full_r='1' then
        pauses(I) <= '1';
-   elsif (orecs(I).condition(dp_condition_fpu_idle_c)='1' and (fpu_busy_vm(0)='1' or fpu_busy_vm(1)='1')) then
-       pauses(I) <= '1';
    elsif (orecs(I).opcode = dp_opcode_fpu_exe_c) then
       -- Before FPU can begin, all transaction to SRAM must be completed already and FPU is idle
       if((orecs(I).vm='0' and (condition_vm0_busy_r(dp_condition_sram_flush_c)='1' or fpu_busy_vm(0)='1')) or
@@ -2208,6 +2206,9 @@ begin
             pcore_source_busy_r <= pcore_source_busy_v;
             sram_source_busy_r <= sram_source_busy_v;
             ddr_source_busy_r <= ddr_source_busy_v;
+
+            condition_vm0_busy_r(dp_condition_fpu_idle_c) <= fpu_busy_vm(0);
+            condition_vm1_busy_r(dp_condition_fpu_idle_c) <= fpu_busy_vm(1);
         end if;
     end if;
 end process;
