@@ -112,7 +112,7 @@ git clone https://github.com/ztachip/ztachip.git
 ```
 
 ## Build procedure for demo #1 - AI+Vision
-This demo demonstrates many vision and AI capabilities using a native [C/C++ library interface] (https://github.com/ztachip/ztachip/raw/master/Documentation/visionai_programmer_guide.pdf)
+This demo demonstrates many vision and AI capabilities using a native [C/C++ library interface](https://github.com/ztachip/ztachip/raw/master/Documentation/visionai_programmer_guide.pdf)
 
 This demo is shown in this [video](https://www.youtube.com/watch?v=amubm828YGs)
 
@@ -321,7 +321,7 @@ Hit any button to return back to Micropython prompt.
 
 ### Running demo #3
 After LLM model has been loaded from SSD card, you will be presented with a prompt on the serial port.
-Enter a questions then hit enter.
+Enter a question then hit enter.
 There will be a response from LLM model.
 Hit Ctrl-C to break the response.
 
