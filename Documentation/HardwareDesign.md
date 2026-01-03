@@ -30,6 +30,8 @@ an array of lightweight VLIW processors.
 all activities within ztachip including memory transfer and launching execution on
 the VLIW processor array.
 
+- [fpu](../HW/src/fpu/fpu.vhd): Handling tensor floating point arithmetics (FLOAT32/BFLOAT) and aggregate arithmetics such as MAX,SUM,DOT-PRODUCT-SUM.
+
 ### Functions:
 
 This is the top-level component of ztachip.
@@ -46,6 +48,8 @@ external DDR memory. Tensor data operations may also include other complex funct
 transpose, dimension resize, data-remap...
 
 - Dispatching tensor operator execution requests to [core](../HW/src/pcore/core.vhd) which then in turn dispatch the execution to an array of VLIW processors. 
+
+- Dispatching tensor floating point and aggregate arithmetic executions to [fpu](../HW/src/fpu/fpu.vhd) 
 
 ## ztachip.dp_core
 
@@ -106,6 +110,61 @@ to DDR external memory can occur at the same time as data transfer from the scra
 - Tensor operator execution is forwarded to [core](../HW/src/pcore/core.vhd) via interface signal task*
 
 - Before tensor operator execution can be issued, all memory transfer with [core](../HW/src/pcore/core.vhd)'s internal memory must be completed. Since there is a seperate [core](../HW/src/pcore/core.vhd)'s internal memory for each hardware thread, for example, memory transfer to [core](../HW/src/pcore/core.vhd)'s internal memory belonging to thread#1 can still be running at the same time while [core](../HW/src/pcore/core.vhd) is busy performing tensor operator execution but on thread#2.
+
+
+## ztachip.fpu
+
+![hw_fpu](images/hw_fpu.png)
+
+[RTL](../HW/src/fpu/fpu_core.vhd)
+
+### Interfaces:
+
+- bus* : AXI interface for RISCV to push FPU instructions to FPU.
+
+- fpu_read*: Read interface to [sram_core](../HW/src/top/sram_core.vhd). FPU operates only from SRAM memory. Data input for FPU must first be transfered from DDR or PCORE memory space to SRAM space by DP instructions.
+
+- fpu_write*: Write interface to [sram_core](../HW/src/top/sram_core.vhd). FPU results are written only to SRAM memory. Results must then be transfered to DDR or PCORE memory space from SRAM space by DP intructions.
+
+### Subcomponents:
+
+- [cmd_fifo](../HW/src/util/fifo.vhd) holds FPU instructions issued from RISCV. Each FPU instruction is associated with a HART context. There are 2 cmd_fifo for each of the HART context.
+
+- [B_fifo_i](../HW/src/util/fifo.vhd) used to store B parameters associated with B+C*X*Y opcode. FPU executions are pipelined with all data input being prefetched and pipelined.
+
+- [X_fifo_i](../HW/src/util/fifo.vhd) used to store X parameters associated with B+C*X*Y opcode. FPU executions are pipelined with all data input being prefetched and pipelined.
+
+- [Y_fifo_i](../HW/src/util/fifo.vhd) used to store Y parameters associated with B+C*X*Y opcode. FPU executions are pipelined with all data input being prefetched and pipelined.
+
+- [falu_core](../HW/src/fpu/falu_core.vhd) performs float functions (float32/bfloat) and aggregate functions (MAX/SUM/DOT_PRODUCT_SUM)
+
+- [falu](../HW/src/fpu/falu.vhd) performs all falu_core functions except for the SUM opcode which is executed by falu2 instead.
+
+- [falu2](../HW/src/fpu/falu.vhd) performs the SUM part after the MAC operations from falu. For example with the operation SUM(X*Y*C), the X*Y*C is performed by falu and results from falu are summed together by falu2
+
+### Functions:
+
+FPU supports floating point arithmetic with different precision below
+
+- FP32: Many transformer intermediate calculations should stay in FP32
+
+- BFLOAT: Transformer activations are normally stored in BFLOAT
+
+Aggregate functions are also better supported by FPU. Aggregate functions are inherently serial operations and better supported with FPU's data flow architecture instead. The following aggregate functions are supported
+
+- MAX
+
+- SUM
+
+- DOT-PRODUCT-SUM
+
+FPU operates from SRAM memory space only
+
+- FPU data input must first be transfered from PCORE or DDR space to SRAM space by DP instructions
+
+- FPU results must be transfered to PCORE or DDR space from SRAM space by DP instructions
+
+For highest performance, FPU should be used under both HART context. There is 1 FPU hardware instance but it can operate under different HART context. One can use one HART context to transfer data between SRAM and DDR/PCORE while the other HART context is still busy executing FPU instructions. This way, all memory overhead are overlapped with FPU execution.
 
 ## ztachip.core
 
@@ -497,6 +556,10 @@ With the above blocks, the following opcodes are supported
   INT12 SHR        : y_out=(x1_in >> x_scalar_in)
   INT12 SHL        : y_out=(x1_in << x_scalar_in)
 ```
+
+
+
+
 
 
 
