@@ -116,8 +116,6 @@ to DDR external memory can occur at the same time as data transfer from the scra
 
 ![hw_fpu](images/hw_fpu.png)
 
-[RTL](../HW/src/fpu/fpu_core.vhd)
-
 ### Interfaces:
 
 - bus* : AXI interface for RISCV to push FPU instructions to FPU.
