@@ -518,6 +518,8 @@
 
 #define FPU_EXE_FMA    7 // A = SUM(X1*X2) for all items
 
+#define FPU_EXE_INVSQRT 8 // A = 1/SQRT(B); --Approximate
+
 #define FPU_EXE_FLOOR  16 // A=FLOOR
 
 #define FPU_EXE_ABS 32 // A=ABS

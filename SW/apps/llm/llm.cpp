@@ -15,6 +15,7 @@
 #include "../../base/util.h"
 #include "../../src/soc.h"
 #include "../../base/zta.h"
+#include "../../base/ztalib.h"
 #include "../../base/ztalog.h"
 #include "../../src/soc.h"
 #include "../../apps/llm/llm.h"
@@ -59,6 +60,8 @@ int TIMEGET()
 #else
 #define TIMEGET TimeGet
 #endif
+
+#define K_MAX  50 // Maximum number of highest priority tokens to be chosen from during sampling
 
 // Constructor of LLAMA object
 
@@ -413,14 +416,17 @@ void llama::Close() {
 // p is the accumulate probability threshold that we can choose the tokens. A large
 // p allows less likely tokens to be chosen.
 
-ZtaStatus llama::SetSamplingPolicy(float temperature,float p) {
+ZtaStatus llama::SetSamplingPolicy(float temperature,float p,int k) {
     if(temperature==0)
         return ZtaStatusFail;
     if(p < 0.0 || p > 1.0)
         return ZtaStatusFail;
+    if(k > K_MAX)
+        return ZtaStatusFail;
     m_samplingGreedy = false;
     m_samplingThreshold = p;
     m_samplingScale = 1/temperature;
+    m_samplingK = k;
     return ZtaStatusOk;
 }
 
@@ -431,6 +437,7 @@ ZtaStatus llama::SetSamplingPolicyGreedy() {
     m_samplingGreedy = true;
     m_samplingThreshold = 0;
     m_samplingScale = 0;
+    m_samplingK = 1;
     return ZtaStatusOk;
 }
 
@@ -457,7 +464,7 @@ float16_t* llama::forward(int token, int pos) {
     int kv_mul = m_config.n_heads / m_config.n_kv_heads;
     int hidden_dim =  m_config.hidden_dim;
     int head_size = dim / m_config.n_heads;
-    
+    uint32_t resp;
 
     // copy the token embedding into x
 
@@ -544,6 +551,8 @@ float16_t* llama::forward(int token, int pos) {
         matmul(-1,hidden_dim, dim, GS,m_runtime.hbq.q,m_runtime.hbq.s, &m_weights.w2q[l],m_runtime.xb);
 
         kernel_llm_residual_exe(-1,dim,m_runtime.x,m_runtime.x,m_runtime.xb); 
+
+        while(ztaReadResponse(&resp)) {}
     }
 
     kernel_llm_rms_exe(-1,dim,m_runtime.x,m_runtime.x,m_weights.rms_final_weight);
@@ -556,8 +565,6 @@ float16_t* llama::forward(int token, int pos) {
     return m_runtime.logits;
 }
 
-#define K_SIZE  8 // Maximum number of highest priority tokens to be chosen from during sampling
-
 // Sampling step
 // Choose the next token from the probability list
 // If greedy sampling is chosen then always choose the token with highest probabily
@@ -569,18 +576,8 @@ float16_t* llama::forward(int token, int pos) {
 // Pick a tokens where the total probability upto the chosen tokens is <= random number 
 
 int llama::sampling(float16_t* _logits) {
-    uint32_t v;
-    uint32_t t;
-    uint32_t i0;
-    uint32_t i1;
-    uint32_t i2;
-    uint32_t i3;
-    uint32_t i4;
-    uint32_t i5;
-    uint32_t i6;
-    uint32_t i7;
-    int top[8];
-    float topp[8];
+    int top[K_MAX];
+    float topp[K_MAX];
     static uint32_t seed = 123456789;
     float accum = 0;
     float prob;
@@ -601,71 +598,17 @@ int llama::sampling(float16_t* _logits) {
 
     // Find the top-k
 
-    i0 = 0x00000000;
-    i1 = 0x00000000;
-    i2 = 0x00000000;
-    i3 = 0x00000000;
-    i4 = 0x00000000;
-    i5 = 0x00000000;
-    i6 = 0x00000000;
-    i7 = 0x00000000;
-
-    for (int i = 0; i < (int)m_config.vocab_size; i++) {
-        v = (_logits[i] << 16) + i;  
-        if ((uint16_t)(v >> 16) > (uint16_t)(i7 >> 16)) {
-            i7 = v;
-            if ((uint16_t)(i7 >> 16) > (uint16_t)(i6 >> 16)) {
-                t = i6; i6 = i7; i7 = t;
-                if ((uint16_t)(i6 >> 16) > (uint16_t)(i5 >> 16)) {
-                    t = i5; i5 = i6; i6 = t;
-                    if ((uint16_t)(i5 >> 16) > (uint16_t)(i4 >> 16)) {
-                        t = i4; i4 = i5; i5 = t;
-                        if ((uint16_t)(i4 >> 16) > (uint16_t)(i3 >> 16)) {
-                            t = i3; i3 = i4; i4 = t;
-                            if ((uint16_t)(i3 >> 16) > (uint16_t)(i2 >> 16)) {
-                                t = i2; i2 = i3; i3 = t;
-                                if ((uint16_t)(i2 >> 16) > (uint16_t)(i1 >> 16)) {
-                                    t = i1; i1 = i2; i2 = t;
-                                    if ((uint16_t)(i1 >> 16) > (uint16_t)(i0 >> 16)) {
-                                        t = i0; i0 = i1; i1 = t;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // Pick the top K probability
-
-    top[0] = (int)(i0 & 0xFFFF);
-    top[1] = (int)(i1 & 0xFFFF);
-    top[2] = (int)(i2 & 0xFFFF);
-    top[3] = (int)(i3 & 0xFFFF);
-    top[4] = (int)(i4 & 0xFFFF);
-    top[5] = (int)(i5 & 0xFFFF);
-    top[6] = (int)(i6 & 0xFFFF);
-    top[7] = (int)(i7 & 0xFFFF);
-    topp[0] = BF2F(_logits[top[0]]);
-    topp[1] = BF2F(_logits[top[1]]);
-    topp[2] = BF2F(_logits[top[2]]);
-    topp[3] = BF2F(_logits[top[3]]);
-    topp[4] = BF2F(_logits[top[4]]);
-    topp[5] = BF2F(_logits[top[5]]);
-    topp[6] = BF2F(_logits[top[6]]);
-    topp[7] = BF2F(_logits[top[7]]);
+    kernel_llm_find_k_max(_logits,m_config.vocab_size,m_samplingK,top,topp);
 
     sum = 0;
-    for (ksz = 0;ksz < K_SIZE; ksz++) {
+    for (ksz = 0;ksz < m_samplingK; ksz++) {
         sum += topp[ksz];
         if (sum >= m_samplingThreshold)
             break;
     }
     ksz++;
-    if (ksz > K_SIZE)
-        ksz = K_SIZE;
+    if (ksz > m_samplingK)
+        ksz = m_samplingK;
 
     sum=0;
     for(int i=0;i < ksz;i++) {

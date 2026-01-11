@@ -83,6 +83,8 @@ ARCHITECTURE behavior OF falu IS
 
 constant RECIPROCAL_LATENCY:integer:=0;
 
+constant INV_SQRT_LATENCY:integer:=0;
+
 constant EXP_LATENCY:integer:=0;
 
 constant MUL_LATENCY:integer:=4;
@@ -143,6 +145,10 @@ constant RECIPROCAL_LUT: RECIPROCAL_LUT_TYPE := (
 signal reciprocal:fp32_t;
 
 signal reciprocal_delay:fp32_t;
+
+signal inv_sqrt:fp32_t;
+
+signal inv_sqrt_delay:fp32_t;
 
 signal exp:fp32_t;
 
@@ -368,6 +374,26 @@ reciprocal_delay_i:delayv
         enable_in=>'1'
     );
 
+
+-------------------------------------------------------------
+-- Process chain to approximate inverse square root
+-------------------------------------------------------------
+
+inv_sqrt <= std_logic_vector(unsigned(std_logic_vector'(x"5F3759DF")) - unsigned('0' & B(31 downto 1)));
+
+inv_sqrt_delay_i:delayv
+    generic map(
+        SIZE=>fp32_t'length,
+        DEPTH=>LATENCY-INV_SQRT_LATENCY
+    )
+    port map(
+        clock_in=>clock_in,
+        reset_in=>reset_in,
+        in_in=>inv_sqrt,
+        out_out=>inv_sqrt_delay,
+        enable_in=>'1'
+    );
+
 -------------------------------------------------------------
 -- Process chain to exp function
 -- A = 2**B where B is INT8 format
@@ -512,6 +538,9 @@ begin
             elsif(opcode_delay=register2_fpu_exe_reciprocal_c) then
                 output_ena_r <= output_ena_delay;
                 output_r <= reciprocal_delay;
+            elsif(opcode_delay=register2_fpu_exe_inv_sqrt_c) then
+                output_ena_r <= output_ena_delay;
+                output_r <= inv_sqrt_delay;
             elsif(opcode_delay=register2_fpu_exe_exp_c) then
                 output_ena_r <= output_ena_delay;
                 output_r <= exp_delay;

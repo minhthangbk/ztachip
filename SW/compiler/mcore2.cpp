@@ -506,6 +506,52 @@ static int scan_reciprocal(
 
 //--------------
 // Generate 
+//   FPU.INVSQRT --> approximate y=1/sqrt(x)
+//---------------
+
+static int scan_invsqrt(
+   FILE *out,
+   std::string &opcode,
+   std::vector<std::string> &names,
+   std::vector<std::string> &parms,
+   std::vector<std::string> &types,
+   std::vector<bool> &isPointers,
+   char end)
+{
+   uint32_t _attr;
+   int i;
+   bool y_valid=false;
+   bool x_valid=false;
+   uint32_t oc;
+
+   oc = FPU_EXE_INVSQRT;
+
+   for(i=0;i < (int)names.size();i++) {
+      if(strcasecmp(names[i].c_str(),"N")==0) {
+         fprintf(out,"ZTAM_GREG(0x%x,0x%x,0)=%s;",FPU_SET_P_CNT,REG_FPU_SET,parms[i].c_str());    
+      } else {
+         if(strcasecmp(names[i].c_str(),"y")==0) {
+            _attr = FPU_SET_P_A;
+            y_valid = true;
+         }
+         else if(strcasecmp(names[i].c_str(),"x")==0) {          
+            _attr = FPU_SET_P_B;
+            x_valid = true;
+         }
+         else
+            error(cMcore::M_currLine, "Invalid parameter");
+         genParm(out,_attr,types[i],parms[i],isPointers[i]);
+      }
+   }
+   if(!y_valid || !x_valid)
+      error(cMcore::M_currLine, "Missing parameter");
+   genEXE(out,oc,end);
+   fprintf(out,"\n");
+   return 0;
+}
+
+//--------------
+// Generate 
 //    FPU.MAX --> y=Max(a,max(x[i])) 
 //    FPU.MAX.ABS --> y=Max(a,max(abs(x[i])))
 // If g parameter present, then this is to find max per group
@@ -657,6 +703,9 @@ char *cMcore::scan_fpu(FILE *out, char *line) {
          return 0;   
    } else if(strcasestr(opcode.c_str(),TOKEN_RECIPROCAL)) {
       if(scan_reciprocal(out,opcode,names,parms,types,isPointers,end) != 0)
+         return 0;
+   } else if(strcasestr(opcode.c_str(),TOKEN_INVSQRT)) {
+      if(scan_invsqrt(out,opcode,names,parms,types,isPointers,end) != 0)
          return 0;   
    } else if(strcasestr(opcode.c_str(),TOKEN_MAX)) {
       if(scan_max(out,opcode,names,parms,types,isPointers,end) != 0)

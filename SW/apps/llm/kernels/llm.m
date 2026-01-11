@@ -29,6 +29,28 @@
 #include "llm.p.img"
 
 //--------------------------------------------------------------------------
+// Approximate y=1/sqrt(x) with Taylor expansion
+// Approximate y(0) with FPU.INVSQRT 
+// Then approximate to float32 accuracy with Newton extension below
+// y(n+1) = y(n) * (1.5f - x/2 * y(n) * y(n));
+//--------------------------------------------------------------------------
+
+void invsqrt(int cnt,float *x,float *y,float *temp,float *temp2)
+{
+   >FPU.INVSQRT(n=cnt,y=(float *)y,x=(float *)x); // Initial estimate
+   
+   >FPU.MAC(n=cnt,y=(float *)temp2,x1=(float *)x,x2=0.5);
+
+   for(int i=0;i < 4;i++) {  
+      >FPU.MAC(n=cnt,y=(float *)temp,a=0.0,x1=(float *)y,x2=(float *)y);
+
+      >FPU.MAC(n=cnt,y=(float *)temp,a=1.5,x1=(float *)temp,x2=(float *)temp2,c=-1.0);
+
+      >FPU.MAC(n=cnt,y=(float *)y,a=0.0,x1=(float *)temp,x2=(float *)y);
+   }
+}
+
+//--------------------------------------------------------------------------
 // Approximate reciprocal y=1/x with Taylor expansion
 // Approximate x(0) with FPU.RECIPROCAL 
 // Then improve accuracy with below
@@ -1173,6 +1195,10 @@ typedef struct
    float    o[RMS_BATCH];
    float    w[RMS_BATCH];
    float    sum;
+   float    ss;
+   float    ss2;
+   float    tmp1;
+   float    tmp2;
 } rms_ws;
 
 void kernel_llm_rms_exe(int reqId,int N,float16_t *x,float16_t *o,float *w)
@@ -1182,8 +1208,18 @@ void kernel_llm_rms_exe(int reqId,int N,float16_t *x,float16_t *o,float *w)
    uint32_t resp;
    rms_ws *ws=0;
    rms_ws *ws2;
-   float ss;
+   float ss,ss2;
+   static float _N_reciprocal;
+   static int _N=0;
+   float N_reciprocal;
+   int diff;
 
+   if(_N != N) {
+      // Save for next time
+      _N_reciprocal = 1/(float)N;
+      _N = N;
+   }
+   N_reciprocal = _N_reciprocal;
    for(i=0;i < N;i += RMS_BATCH) {
       cnt = N-i;
       cnt = ((cnt+3)/4)*4;
@@ -1199,34 +1235,16 @@ void kernel_llm_rms_exe(int reqId,int N,float16_t *x,float16_t *o,float *w)
       }
    }
 
-   // Now wait for operations to complete since we dont have
-   // acceleration for 1/sqrtf yet
-   // For now we do 1/sqrtf by RISCV
-   // There is just 1 calculation so it not affecting performance 
+   >FPU.MAC(N=1,y=(float *)&ws->ss,C=(float)N_reciprocal,x1=(float *)(&ws->sum));
 
-   ztaJobDone(123);
-   for(;;) {
-      if(ztaReadResponse(&resp) && resp==123)
-         break;
-   }
+   >FPU.MAC(N=1,a=1e-5,y=(float *)&ws->ss,x1=(float *)(&ws->ss));
 
-   ws2 = (rms_ws *)0x40000000; // Memory mapped to access SCRATCH memory from RISCV
-
-   *((uint16_t *)(&ss)) = *((uint16_t *)(&ws2->sum));
-
-   *(((uint16_t *)(&ss))+1) = *(((uint16_t *)(&ws2->sum))+1);
-
-   ss /= N;
-
-   ss += 1e-5f;
-
-   ss = 1.0f / sqrtf(ss);
+   invsqrt(1,(float *)&ws->ss,(float *)&ws->ss2,(float *)&ws->tmp1,(float *)&ws->tmp2);
 
    for(i=0;i < N;i += RMS_BATCH) {
       cnt = N-i;
       if(cnt > RMS_BATCH)
          cnt = RMS_BATCH;
-
 
       > DTYPE(INT16)SCRATCH((uint32_t)&ws->w[0],2*cnt)[:] <= DTYPE(INT16)MEM((uint32_t)w,2*N)[2*i:2*i+2*cnt-1];
 
@@ -1234,7 +1252,7 @@ void kernel_llm_rms_exe(int reqId,int N,float16_t *x,float16_t *o,float *w)
 
       // o[j] = weight[j] * (ss * x[j]);
 
-      >FPU.MAC(N=cnt,y=(bfloat *)ws->o,c=(float)ss,x1=(bfloat *)ws->x,x2=(float *)ws->w);
+      >FPU.MAC(N=cnt,y=(bfloat *)ws->o,c=(float *)&ws->ss2,x1=(bfloat *)ws->x,x2=(float *)ws->w);
 
       >DTYPE(INT16)MEM((uint32_t)o,N)[i:i+cnt-1] <= DTYPE(INT16)SCRATCH(((uint32_t)&ws->o[0]),cnt)[0:cnt-1];   
 
@@ -1450,6 +1468,102 @@ static int find_max(uint16_t *x,int N)
       }
    }
    return found;
+}
+
+#define K_MAX 128
+
+#define MAX_K_GROUP_SZ 64
+
+#define MAX_K_BATCH (MAX_K_GROUP_SZ*32)
+
+typedef struct  {
+   uint16_t    x[2][MAX_K_BATCH];
+   uint16_t    y[2][MAX_K_BATCH/MAX_K_GROUP_SZ];
+} find_max_k_ws;
+
+//--------------------------------------------------------------------------
+// Kernel to find the maximum of series of blocks
+// We need to do into 2 steps because we need to find the position
+// of the max value with find_max function
+//--------------------------------------------------------------------------
+
+int kernel_llm_find_k_max(float16_t *x,uint32_t _N,int K, int *top,float *topp) {
+   uint32_t cnt,cnt2;
+   int N;
+   int toggle=0;
+   uint32_t v;
+   uint32_t t;
+   static union {
+      struct {
+         uint16_t idx;
+         float16_t f;
+      } s;
+      uint32_t dw;
+   } max[K_MAX];
+   bool last;
+   find_max_k_ws *ws;
+   volatile find_max_k_ws *ws2;
+   
+   assert(K <= K_MAX);
+
+   ws=(find_max_k_ws *)0;
+   
+   ws2 = (find_max_k_ws *)0x40000000;
+
+   for(int i=0;i < K;i++) {
+      max[i].dw = 0;
+   }
+
+   N = ((_N+MAX_K_GROUP_SZ-1)/MAX_K_GROUP_SZ)*MAX_K_GROUP_SZ;
+
+   >DTYPE(INT16)SCRATCH((uint32_t)&ws->x[toggle][0],MAX_K_BATCH)[:] <= DTYPE(INT16)MEM((uint32_t)x,_N)[0:MAX_K_BATCH-1];
+
+   >FPU.MAX(N=MAX_K_BATCH,y=(bfloat *)ws->y[toggle],x=(bfloat *)ws->x[toggle],g=63);
+
+   for (int i = 0; i < N; i+=MAX_K_BATCH) {
+      cnt = N-i;
+      cnt = MIN(cnt,MAX_K_BATCH);
+      cnt = MAX(cnt,MAX_K_GROUP_SZ);
+      last = ((i+cnt) >= N)?true:false; 
+
+      kernel_llm_done();
+
+      FLUSH_DATA_CACHE();
+
+      if(!last) {
+         cnt2 = N-(i+MAX_K_BATCH);
+         cnt2 = MIN(cnt2,MAX_K_BATCH);
+         cnt2 = MAX(cnt2,MAX_K_GROUP_SZ);
+
+         >DTYPE(INT16)SCRATCH((uint32_t)&ws->x[!toggle][0],cnt2)[:] <= DTYPE(INT16)MEM((uint32_t)x,_N)[i+MAX_K_BATCH:i+MAX_K_BATCH+cnt2-1];
+
+         >FPU.MAX(N=cnt2,y=(bfloat *)ws->y[!toggle],x=(bfloat *)ws->x[!toggle],g=63);
+      }
+
+      for(int j=0;j < cnt;j+=MAX_K_GROUP_SZ) {
+         if( ws2->y[toggle][j/MAX_K_GROUP_SZ] <= max[K-1].s.f)
+            continue;
+         for(int k=0;k < MAX_K_GROUP_SZ;k++) {
+            v = ws2->x[toggle][j+k];
+            if (v > max[K-1].s.f) {
+               max[K-1].s.f = v;
+               max[K-1].s.idx = i+j+k;
+               for(int kk=K-1;kk >= 1;kk--) {
+                  if(max[kk].s.f <= max[kk-1].s.f)
+                     break;
+                  t = max[kk-1].dw;max[kk-1].dw=max[kk].dw;max[kk].dw=t;
+               }
+            }
+         }
+      }
+      toggle = !toggle;
+   }
+
+   for(int i=0;i < K;i++) {
+      top[i] = (int)max[i].s.idx;
+      topp[i] = BF2F(max[i].s.f);
+   }
+   return 0;
 }
 
 //--------------------------------------------------------------------------

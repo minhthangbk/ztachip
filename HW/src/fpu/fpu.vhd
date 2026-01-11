@@ -1101,6 +1101,7 @@ if(exe='1') then
     -- Advance destination address
     if(fpu_instruction_r.opcode=register2_fpu_exe_mac_c or
         fpu_instruction_r.opcode=register2_fpu_exe_reciprocal_c or
+        fpu_instruction_r.opcode=register2_fpu_exe_inv_sqrt_c or
         fpu_instruction_r.opcode=register2_fpu_exe_exp_c) then
         A_addr <= fpu_instruction_r.A_addr + resize(fpu_instruction_r.A_precision,fpu_instruction_r.A_addr'length);
 --VUONG

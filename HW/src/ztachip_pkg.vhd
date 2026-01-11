@@ -1106,6 +1106,8 @@ constant register2_fpu_exe_F_MASK_c:std_logic_vector:="010000";
 
 constant register2_fpu_exe_X_MASK_c:std_logic_vector:="001111";
 
+
+
 constant register2_fpu_exe_mac_c:integer:=1; -- A = B + C*X*Y;
 
 constant register2_fpu_exe_group_max_c:integer:=2; -- A = MAX(B) in group of C items
@@ -1119,6 +1121,8 @@ constant register2_fpu_exe_exp_c:integer:=5; -- A = 2**B where B is INT8
 constant register2_fpu_exe_max_c:integer:=6; -- A = MAX(B) of all items
 
 constant register2_fpu_exe_fma_c:integer:=7; -- FMA
+
+constant register2_fpu_exe_inv_sqrt_c:integer:=8; -- INV_SQRT
 
 constant register2_fpu_exe_floor_c:integer:=16; --A=FLOOR
 

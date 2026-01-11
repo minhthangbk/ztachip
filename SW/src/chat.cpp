@@ -95,7 +95,7 @@ int chat() {
 #endif
 #endif
 
-      ai.SetSamplingPolicy(0.5,0.8); // temperature=0.8,threshold=0.9
+      ai.SetSamplingPolicy(0.5,0.85,20); // temperature=0.8,threshold=0.9;top-k=20
 //      ai.SetSamplingPolicyGreedy();
 #ifdef __WIN32__
     ai.SystemPrompt((char*)"You are a helpful assistant.");

@@ -67,6 +67,7 @@
 #define TOKEN_RECIPROCAL      "FPU.RECIPROCAL"
 #define TOKEN_MAX             "FPU.MAX"
 #define TOKEN_SUM             "FPU.SUM"
+#define TOKEN_INVSQRT         "FPU.INVSQRT"
 
 
 class cMcoreRange;

@@ -80,7 +80,7 @@ object RiscvConfig{
         catchIllegalInstruction = true 
       ),
       new StaticMemoryTranslatorPlugin(
-        ioRange      = x => x(31 downto 31) === 0x1 || x(31 downto 30) === 0x1
+        ioRange      = _(31 downto 31) === 0x1
       ),
       new RegFilePlugin(
         regFileReadyKind = plugin.ASYNC,

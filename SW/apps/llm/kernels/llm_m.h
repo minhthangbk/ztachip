@@ -66,6 +66,8 @@ extern void kernel_llm_scale_exe(int reqId,int N,float16_t *x,float scale);
 
 extern int kernel_llm_find_max(float16_t *x,uint32_t N);
 
+extern int kernel_llm_find_k_max(float16_t *x,uint32_t N,int K,int *top,float *topp);
+
 extern void kernel_llm_done();
 
 #ifdef __cplusplus

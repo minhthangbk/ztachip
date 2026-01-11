@@ -3023,6 +3023,7 @@ char *cMcore::decode(char *line, FILE *out, int *cmd)
       strcasestr(token, TOKEN_MAC) || 
       strcasestr(token, TOKEN_EXP) || 
       strcasestr(token,TOKEN_RECIPROCAL) ||
+      strcasestr(token,TOKEN_INVSQRT) ||
       strcasestr(token,TOKEN_MAX) ||
       strcasestr(token,TOKEN_SUM) 
       )
