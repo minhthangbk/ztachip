@@ -124,7 +124,6 @@ make clean all
 cd ../fs
 python3 bin2c.py
 cd ..
-make clean all -f makefile.quant
 make clean all -f makefile.kernels
 make clean all
 ```
@@ -179,7 +178,10 @@ python convert_hf_to_gguf.py <model-download-folder>/SmolLM2-135M-Instruct --out
 - Quantize the model to ztachip ZUF format.
 
 ```
-<ztachip-folder>/SW/build/quant ZTA Q4 SmolLM2-135M-Instruct.gguf SMOLLM2.ZUF
+export PATH=/opt/riscv/bin:$PATH
+cd ztachip/SW
+make clean all -f makefile.quant
+./build/quant ZTA Q4 SmolLM2-135M-Instruct.gguf SMOLLM2.ZUF
 ```
 
 - Copy SMOLLM2.ZUF to a Micro-SSD card and plug the card to Micro-SSD card slot of the dev-kit.
