@@ -35,7 +35,10 @@ int main(int argc,char *argv[])
         printf("Invalid quantization");
         return -1;
     }
-    gguf.Open(argv[3]);
+    if(gguf.Open(argv[3]) != ZtaStatusOk) {
+        printf("Error open GGUF file \r\n");
+        exit(-1);
+    }
     if(gguf.SaveAsZUF(argv[4],forSim,quant) != ZtaStatusOk)
         printf("quantization fail \r\n");
     else

@@ -1482,9 +1482,7 @@ typedef struct  {
 } find_max_k_ws;
 
 //--------------------------------------------------------------------------
-// Kernel to find the maximum of series of blocks
-// We need to do into 2 steps because we need to find the position
-// of the max value with find_max function
+// Find the top-k tokens of highest probability
 //--------------------------------------------------------------------------
 
 int kernel_llm_find_k_max(float16_t *x,uint32_t _N,int K, int *top,float *topp) {
@@ -1516,6 +1514,8 @@ int kernel_llm_find_k_max(float16_t *x,uint32_t _N,int K, int *top,float *topp) 
 
    N = ((_N+MAX_K_GROUP_SZ-1)/MAX_K_GROUP_SZ)*MAX_K_GROUP_SZ;
 
+   // Fetch tokens from DDR to SCRATCH
+
    >DTYPE(INT16)SCRATCH((uint32_t)&ws->x[toggle][0],MAX_K_BATCH)[:] <= DTYPE(INT16)MEM((uint32_t)x,_N)[0:MAX_K_BATCH-1];
 
    >FPU.MAX(N=MAX_K_BATCH,y=(bfloat *)ws->y[toggle],x=(bfloat *)ws->x[toggle],g=63);
@@ -1531,6 +1531,8 @@ int kernel_llm_find_k_max(float16_t *x,uint32_t _N,int K, int *top,float *topp) 
       FLUSH_DATA_CACHE();
 
       if(!last) {
+         // Prefetch tokens and get FPGA to process for next batch of tokens
+         //  while RISCV is busy processing 
          cnt2 = N-(i+MAX_K_BATCH);
          cnt2 = MIN(cnt2,MAX_K_BATCH);
          cnt2 = MAX(cnt2,MAX_K_GROUP_SZ);
@@ -1548,6 +1550,8 @@ int kernel_llm_find_k_max(float16_t *x,uint32_t _N,int K, int *top,float *topp) 
             if (v > max[K-1].s.f) {
                max[K-1].s.f = v;
                max[K-1].s.idx = i+j+k;
+               // Push the new entries down the max probability list in order
+               // of probability value
                for(int kk=K-1;kk >= 1;kk--) {
                   if(max[kk].s.f <= max[kk-1].s.f)
                      break;
