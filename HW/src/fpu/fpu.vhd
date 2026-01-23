@@ -1186,6 +1186,8 @@ end process;
 
 process(fpu_write,fpu_eof,writedata_r,fpu_writedata,fpu_wr_addr,writedata,fpu_wr_precision)
 variable complete_v:std_logic;
+variable fp16_v:std_logic_vector(15 downto 0);
+variable fp16_max_v:std_logic_vector(15 downto 0);
 begin
     writedata <= writedata_r;
     writebe <= writebe_r;
@@ -1203,18 +1205,23 @@ begin
             end if;
         elsif(fpu_wr_precision=2) then
             -- precision is FP16
+            fp16_v := fpu_writedata(31 downto 16);
+            fp16_max_v := (others=>'1');
+            if(fpu_writedata(15)='1' and fp16_v /= fp16_max_v) then
+                fp16_v := std_logic_vector(unsigned(fp16_v) + to_unsigned(1,fp16_v'length));
+            end if;
             case fpu_wr_addr(2 downto 1) is
                 when "00" => 
-                    writedata(15 downto 0) <= fpu_writedata(31 downto 16);  
+                    writedata(15 downto 0) <= fp16_v;  
                     writebe(1 downto 0) <= (others=>'1');
                 when "01" => 
-                    writedata(31 downto 16) <= fpu_writedata(31 downto 16);  
+                    writedata(31 downto 16) <= fp16_v;  
                     writebe(3 downto 2) <= (others=>'1');
                 when "10" => 
-                    writedata(47 downto 32) <= fpu_writedata(31 downto 16); 
+                    writedata(47 downto 32) <= fp16_v; 
                     writebe(5 downto 4) <= (others=>'1'); 
                 when others => 
-                    writedata(63 downto 48) <= fpu_writedata(31 downto 16);
+                    writedata(63 downto 48) <= fp16_v;
                     writebe(7 downto 6) <= (others=>'1'); 
                     complete_v := '1'; 
             end case;

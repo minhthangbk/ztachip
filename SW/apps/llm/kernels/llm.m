@@ -58,19 +58,19 @@ void invsqrt(int cnt,float *x,float *y,float *temp,float *temp2)
 // Do in batch of cnt float numbers
 //--------------------------------------------------------------------------
 
-static void reciprocal(int cnt,float *x,float *y,float *temp)
+static void reciprocal(int cnt,float *x,int xfmt,float *y,float *temp)
 {
-   >FPU.RECIPROCAL(n=cnt,y=(float *)y,x=(float *)x);
+   >FPU.RECIPROCAL(n=cnt,y=(float *)y,x=(xfmt)x);
 
-   >FPU.MAC(N=cnt,y=(float *)temp,a=2.0,x1=(float *)x,x2=(float *)y,c=-1.0)...;
-
-   >FPU.MAC(N=cnt,y=(float *)y,x1=(float *)temp,x2=(float *)y)...;
-
-   >FPU.MAC(N=cnt,y=(float *)temp,a=2.0,x1=(float *)x,x2=(float *)y,c=-1.0)...;
+   >FPU.MAC(N=cnt,y=(float *)temp,a=2.0,x1=(xfmt)x,x2=(float *)y,c=-1.0)...;
 
    >FPU.MAC(N=cnt,y=(float *)y,x1=(float *)temp,x2=(float *)y)...;
 
-   >FPU.MAC(N=cnt,y=(float *)temp,a=2.0,x1=(float *)x,x2=(float *)y,c=-1.0)...;
+   >FPU.MAC(N=cnt,y=(float *)temp,a=2.0,x1=(xfmt)x,x2=(float *)y,c=-1.0)...;
+
+   >FPU.MAC(N=cnt,y=(float *)y,x1=(float *)temp,x2=(float *)y)...;
+
+   >FPU.MAC(N=cnt,y=(float *)temp,a=2.0,x1=(xfmt)x,x2=(float *)y,c=-1.0)...;
 
    >FPU.MAC(N=cnt,y=(float *)y,x1=(float *)temp,x2=(float *)y);
 }
@@ -464,7 +464,6 @@ void kernel_llm_matmul_q8_exe(
 #define BATCH_DIVIDE 1024 
 
 typedef struct {
-   float    y32[BATCH_QUANT];
    float    y16[BATCH_QUANT];
    float    x[BATCH_QUANT];
    float    y[BATCH_QUANT];
@@ -508,10 +507,6 @@ void kernel_llm_quantize_exe(int reqId,int N,float16_t *x,float16_t *s,uint8_t *
 
       > FPU.MAX.ABS(N=remain,y=(float *)ws->y,x=(bfloat *)ws->x,g=31);
 
-      // Then divide the MAX by 127, get result in FP32 for next step calculation
-
-      >FPU.MAC(N=remain2,y=(float *)ws->y32,x1=(float *)ws->y,x2=(float)0.0078740157);
-
       // Then divide the MAX by 127, get result in FP16, this the the scaling factor used
       // when dequantize
 
@@ -519,7 +514,7 @@ void kernel_llm_quantize_exe(int reqId,int N,float16_t *x,float16_t *s,uint8_t *
 
       >DTYPE(INT16)MEM(y16,N/32)[j:j+remain2-1] <= DTYPE(INT16)SCRATCH((uint32_t)ws->y16,remain2)[:];
 
-      reciprocal(remain2,ws->y32,ws->y,ws->temp);
+      reciprocal(remain2,ws->y16,FPU_SET_W_FP16|FPU_SET_M_ADDR,ws->y,ws->temp);
 
       x1 = (unsigned int)(&((uint16_t *)x)[j * GS]);
       y = (unsigned int)(&q[0]);
@@ -1037,7 +1032,7 @@ void kernel_llm_SwiGLU_exe(int reqId,float16_t *hb,float16_t *hb2,int N)
                1.0f,
                2);
 
-      reciprocal(cnt,ws->tmp5,ws->tmp3,ws->tmp2); // tmp3 = 1/tmp1
+      reciprocal(cnt,ws->tmp5,FPU_SET_W_FP32|FPU_SET_M_ADDR,ws->tmp3,ws->tmp2); // tmp3 = 1/tmp1
 
       >FPU.MAC(N=cnt,y=(float *)ws->tmp1,x1=(float *)ws->tmp3,x2=(bfloat *)ws->hb); // tmp1 = tmp3 * hb
 
@@ -1156,7 +1151,7 @@ void kernel_llm_softmax_exe(int reqId,float16_t *x,int N)
 
    // Calculate final results
 
-   reciprocal(1,&ws->sum,&ws->scale,&ws->temp);
+   reciprocal(1,&ws->sum,FPU_SET_W_FP32|FPU_SET_M_ADDR,&ws->scale,&ws->temp);
 
    for(i=0;i < N;i += SOFTMAX_BATCH) {
       cnt = N-i;
@@ -1597,6 +1592,8 @@ int kernel_llm_find_max(float16_t *x,uint32_t N) {
 
       kernel_llm_done();
 
+      FLUSH_DATA_CACHE();
+
       if(i==0) {
          maxi = i;
          max = BF2F(ws2->y[0]);
@@ -1629,6 +1626,8 @@ int kernel_llm_find_max(float16_t *x,uint32_t N) {
    >FPU.MAX(N=cnt,y=(bfloat *)ws->y,x=(bfloat *)ws->x,g=(FPU_SET_M_VALUE|FPU_SET_W_FP32)cnt2);
 
    kernel_llm_done();
+
+   FLUSH_DATA_CACHE();
 
    group = find_max(&ws2->y[0],cnt/MAX_GROUP_SZ);
 

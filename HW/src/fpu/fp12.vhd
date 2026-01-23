@@ -62,6 +62,8 @@ SIGNAL exp_rr:unsigned(fp12_exp_width_c-1 DOWNTO 0);
 SIGNAL shift_left_by:unsigned(fp12_exp_width_c-1 DOWNTO 0);
 SIGNAL mantissa:STD_LOGIC_VECTOR(fp12_mantissa_width_c-1 DOWNTO 0);
 SIGNAL mantissa_r:STD_LOGIC_VECTOR(fp12_mantissa_width_c-1 DOWNTO 0);
+SIGNAL round:STD_LOGIC;
+SIGNAL round_r:STD_LOGIC;
 BEGIN
 
 
@@ -82,7 +84,19 @@ shift_i : SHIFT_LEFT_L
 
 mantissa <= input_shift(input_shift'length-1 downto input_shift'length-fp12_mantissa_width_c);
 
-output_out <= sign_rrr & std_logic_vector(exp_rr) & mantissa_r;
+round <= input_shift(input_shift'length-fp12_mantissa_width_c-1);
+
+
+process(round_r,mantissa_r,sign_rrr,exp_rr)
+variable mantissa_v:STD_LOGIC_VECTOR(fp12_mantissa_width_c-1 DOWNTO 0);
+begin
+    if(round_r='1' and mantissa_r /= (mantissa_r'range => '1')) then
+        mantissa_v := std_logic_vector(unsigned(mantissa_r)+to_unsigned(1,mantissa_r'length));
+    else
+        mantissa_v := mantissa_r;
+    end if;
+    output_out <= sign_rrr & std_logic_vector(exp_rr) & mantissa_v;
+end process;
 
 -- Determine exponent by finding leading '1'
 
@@ -116,6 +130,7 @@ begin
         exp_r <= (others=>'0');
         exp_rr <= (others=>'0');
         mantissa_r <= (others=>'0');
+        round_r <= '0';
     else
         if clock_in'event and clock_in='1' then
             -- Stage 1 -- Negate input of it is a negative number
@@ -136,8 +151,10 @@ begin
             -- Stage3: barrel shifter
             if(exp_r=0) then
                 mantissa_r <= input_rr(mantissa_r'length-1 downto 0);
+                round_r <= '0';
             else
                 mantissa_r <= mantissa;
+                round_r <= round;
             end if;
             sign_rrr <= sign_rr;
             exp_rr <= exp_r;
