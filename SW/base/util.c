@@ -65,7 +65,7 @@ int16_t FLOAT2INT(float in) {
    int v2;
    int e, e2;
    short result;
-   int pos=DATA_BIT_WIDTH-1;
+   int pos=SPU_DATA_WIDTH-1;
 
    v = *((unsigned int *)&in);
    if (v == 0) {
@@ -98,7 +98,10 @@ int16_t FLOAT2INT(float in) {
          }
       }
    }
-   return (result>>4);
+   result =  (result>>4);
+   if(result & 0x800)
+      result |= 0xF000;
+   return result;
 }
 
 // Read 24bit BMP image file

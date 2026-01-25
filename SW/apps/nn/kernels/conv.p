@@ -35,8 +35,9 @@ int convolution::dx;
 _kernel_ void convolution::start(_global int count) {
    int i;
    for(i=0;i < count;i++) {
-      _A[i] = biasLo;
-      _A[i] += biasHi*1024;
+      _A[i] = biasHi;
+      _A[i] = (_A[i] << (DATA_BIT_WIDTH-2));
+      _A[i] += biasLo;
    }
 }
 
@@ -115,8 +116,9 @@ _kernel_ void convolution_depthwise::exe3x3(_global int k,_global int offset) {
    int i,j;
    vint16 *p2;
 
-   _A[k] = biasLo;
-   _A[k] += biasHi*1024;
+   _A[k] = biasHi;
+   _A[k] = (_A[k] << (DATA_BIT_WIDTH-2));
+   _A[k] += biasLo;
 #pragma unroll
    for(j=0;j < 3;j++) {
       _A[k] += p[offset+j]*coef[j];
@@ -155,8 +157,9 @@ int convolution1x1::dysz;
 _kernel_ void convolution1x1::start(_global int count) {
    int i;
    for(i=0;i < count;i++) {
-      _A[i] = biasLo;
-      _A[i] += biasHi*1024;
+      _A[i] = biasHi;
+      _A[i] = (_A[i] << (DATA_BIT_WIDTH-2));
+      _A[i] += biasLo;
    }
 }
 

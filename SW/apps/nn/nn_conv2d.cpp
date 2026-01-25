@@ -360,7 +360,7 @@ void NeuralNetLayerConv2D::GenBias(int32_t *bias,int biasLen,int32_t activationB
    int16_t *biasLo,*biasHi;
    int32_t v;
    int16_t hi,lo;
-   int range=(1<<(DATA_BIT_WIDTH-2));
+   int range=(1<<(DATA_BIT_WIDTH-2)); 
    biasHi_p = m_nn->BufferAllocate(biasLen*sizeof(int16_t));
    biasLo_p = m_nn->BufferAllocate(biasLen*sizeof(int16_t));
    biasLo = (int16_t *)ZTA_SHARED_MEM_VIRTUAL(biasLo_p);

@@ -102,7 +102,6 @@ signal shift_direction_r:std_logic; -- 1 for right shift; 0 for left shift
 signal shift_direction_rr:std_logic; -- 1 for right shift; 0 for left shift
 signal shift_direction_rrr:std_logic; -- 1 for right shift; 0 for left shift
 signal shift_direction_rrrr:std_logic; -- 1 for right shift; 0 for left shift
-signal y_mul_ext:std_logic_vector(accumulator_width_c-2*register_width_c-1 downto 0);
 signal add_x1:std_logic_vector(accumulator_width_c-1 downto 0);
 
 signal fp12_value:fp12_t;
@@ -192,7 +191,8 @@ begin
    end if;
 
    if(mu_opcode_rrrr=mu_opcode_conv_c) then
-      y3_r <= fp12_value;
+      y3_r(fp12_value'length-1 downto 0) <= fp12_value;
+      y3_r(y3_r'length-1 downto fp12_value'length) <= (others=>'0');
    elsif(mu_opcode_rrrr=mu_opcode_lsb4_c) then
       y3_r(3 downto 0) <= y_shift_r(3 downto 0);
       y3_r(y3_r'length-1 downto 4) <= (others=>y_shift_r(3));
@@ -272,9 +272,7 @@ GEN2: IF(fpu_enabled_c = FALSE) GENERATE
 fp12_value <= (others=>'0');
 END GENERATE GEN2;
 
-y_mul_ext <= (others=>y_mul(y_mul'length-1));
-
-add_x1 <= y_mul_ext & y_mul;
+add_x1 <= y_mul;
 
 process(clock_in,reset_in)
 begin

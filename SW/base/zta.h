@@ -43,7 +43,7 @@
 
 #define DP_TEMPLATE_MAX  (1<<DP_TEMPLATE_ID_WIDTH)
 
-#define DATA_BIT_WIDTH  12
+#define DATA_BIT_WIDTH  16
 
 // Max shift distance
 
@@ -463,9 +463,13 @@
 
 #define SPU_NUM_STREAM  4
 
-#define SPU_SIZE  128
+#define SPU_SIZE_WIDTH  7
 
-#define SPU_REMAINDER_LN  5
+#define SPU_SIZE        (1<<SPU_SIZE_WIDTH)
+
+#define SPU_DATA_WIDTH 12
+
+#define SPU_REMAINDER_LN  (SPU_DATA_WIDTH-SPU_SIZE_WIDTH)
 
 #define SPU_REMAINDER  (1<<SPU_REMAINDER_LN)
 

@@ -741,7 +741,8 @@ BEGIN
             mu_y_vector_r <= mu_y_vector;
 
             mu_x1_c1_en_r <= mu_x1_c1_en;
-            mu_x1_c1_r <= std_logic_vector(mu_x1_i2(mu_x1_c1_r'length-1 downto 0));
+            mu_x1_c1_r(mu_x1_i2'length-1 downto 0) <= std_logic_vector(mu_x1_i2);
+            mu_x1_c1_r(mu_x1_c1_r'length-1 downto mu_x1_i2'length) <= (others=>mu_x1_i2(mu_x1_i2'length-1));
 
             if instruction_tid_valid_in='1' then
                 -- Decode the instruction

@@ -424,8 +424,8 @@ stream_i: stream
    PORT MAP(clock_in =>clock_in,
             reset_in =>reset_in,
             stream_id_in => stream_read_id,
-            input_in => stream_read_input((I+1)*register_width_c-1 downto I*register_width_c),
-            output_out =>stream_read_output((I+1)*register_width_c-1 downto I*register_width_c),
+            stream_input_in => stream_read_input((I+1)*register_width_c-1 downto I*register_width_c),
+            stream_output_out =>stream_read_output((I+1)*register_width_c-1 downto I*register_width_c),
             config_in => spe_wr,
             config_reg_in => spe_addr,
             config_data_in => spe_data
@@ -445,8 +445,8 @@ stream_i1: stream
    PORT MAP(clock_in =>clock_in,
             reset_in =>reset_in,
             stream_id_in => stream_write_id,
-            input_in => stream_write_input((I+1)*register_width_c-1 downto I*register_width_c),
-            output_out =>stream_write_output((I+1)*register_width_c-1 downto I*register_width_c),
+            stream_input_in => stream_write_input((I+1)*register_width_c-1 downto I*register_width_c),
+            stream_output_out =>stream_write_output((I+1)*register_width_c-1 downto I*register_width_c),
             config_in => spe_wr,
             config_reg_in => spe_addr,
             config_data_in => spe_data

@@ -185,9 +185,7 @@ constant vector_width_c     :integer:=(2**vector_depth_c);    -- Vector width
 
 constant accumulator_width_c:integer:=32;   -- accumulator width
 
-constant register_width_c   :integer:=12;   -- register width
-
-constant register_byte_width_c: integer:=(register_width_c/8);
+constant register_width_c   :integer:=16;   -- register width
 
 constant vaccumulator_width_c:integer:=(accumulator_width_c*vector_width_c);   -- accumulator width
 
@@ -780,6 +778,8 @@ constant dp_full_addr_width_c: integer:=32;
 constant stream_lookup_depth_c:integer:=9;
 
 constant stream_lookup_size_c:integer:=(2**stream_lookup_depth_c);
+
+constant stream_register_width_c:integer:=12; -- Max width of data to be interpolated by streamer
 
 subtype stream_id_t is unsigned(1 downto 0); -- stream id datatype
 
@@ -3071,8 +3071,8 @@ COMPONENT stream IS
    PORT(SIGNAL clock_in             : IN STD_LOGIC;
         SIGNAL reset_in             : IN STD_LOGIC;
         SIGNAL stream_id_in         : IN stream_id_t;
-        SIGNAL input_in             : IN STD_LOGIC_VECTOR(register_width_c-1 downto 0);
-        SIGNAL output_out           : OUT STD_LOGIC_VECTOR(register_width_c-1 downto 0);
+        SIGNAL stream_input_in      : IN STD_LOGIC_VECTOR(register_width_c-1 downto 0);
+        SIGNAL stream_output_out    : OUT STD_LOGIC_VECTOR(register_width_c-1 downto 0);
         -- Host configuration
         SIGNAL config_in            : IN STD_LOGIC;
         SIGNAL config_reg_in        : IN std_logic_vector(stream_lookup_depth_c-1 downto 0);

@@ -33,8 +33,8 @@ ENTITY stream IS
    PORT(SIGNAL clock_in             : IN STD_LOGIC;
         SIGNAL reset_in             : IN STD_LOGIC;
         SIGNAL stream_id_in         : IN stream_id_t;
-        SIGNAL input_in             : IN STD_LOGIC_VECTOR(register_width_c-1 downto 0);
-        SIGNAL output_out           : OUT STD_LOGIC_VECTOR(register_width_c-1 downto 0);
+        SIGNAL stream_input_in      : IN STD_LOGIC_VECTOR(register_width_c-1 downto 0);
+        SIGNAL stream_output_out    : OUT STD_LOGIC_VECTOR(register_width_c-1 downto 0);
 
         -- Host configuration
         
@@ -74,36 +74,70 @@ END COMPONENT;
 
 constant stream_lookup_depth2_c:integer:=(stream_lookup_depth_c-stream_id_t'length);
 SIGNAL stream_id_r:stream_id_t;
-SIGNAL input_r:STD_LOGIC_VECTOR(register_width_c-1 downto 0);
+SIGNAL input_r:STD_LOGIC_VECTOR(stream_register_width_c-1 downto 0);
 SIGNAL waddr_r:STD_LOGIC_VECTOR(stream_lookup_depth_c-1 downto 0);
 SIGNAL input:STD_LOGIC_VECTOR(stream_lookup_depth_c-1 downto 0);
 SIGNAL address:STD_LOGIC_VECTOR(stream_lookup_depth_c-1 downto 0);
-SIGNAL writedata:STD_LOGIC_VECTOR(2*register_width_c-1 downto 0);
-SIGNAL writedata_r:STD_LOGIC_VECTOR(2*register_width_c-1 downto 0);
-SIGNAL y_mul:STD_LOGIC_VECTOR(2*register_width_c-1 downto 0);
-SIGNAL y_mul_r:STD_LOGIC_VECTOR(2*register_width_c-1 downto 0);
+SIGNAL writedata:STD_LOGIC_VECTOR(2*stream_register_width_c-1 downto 0);
+SIGNAL writedata_r:STD_LOGIC_VECTOR(2*stream_register_width_c-1 downto 0);
+SIGNAL y_mul:STD_LOGIC_VECTOR(2*stream_register_width_c-1 downto 0);
+SIGNAL y_mul_r:STD_LOGIC_VECTOR(2*stream_register_width_c-1 downto 0);
 SIGNAL wena_r:STD_LOGIC;
-SIGNAL readdata2_r:STD_LOGIC_VECTOR(register_width_c-1 downto 0);
-SIGNAL readdata_lookup:STD_LOGIC_VECTOR(2*register_width_c-1 downto 0);
-SIGNAL readdata:STD_LOGIC_VECTOR(2*register_width_c-1 downto 0);
-SIGNAL readdata_r:STD_LOGIC_VECTOR(register_width_c-1 downto 0);
-SIGNAL readdata_rr:STD_LOGIC_VECTOR(register_width_c-1 downto 0);
-SIGNAL readdata_rrr:STD_LOGIC_VECTOR(register_width_c-1 downto 0);
-SIGNAL remainder:STD_LOGIC_VECTOR(register_width_c-stream_lookup_depth2_c-1 downto 0);
-SIGNAL remainder_r:STD_LOGIC_VECTOR(register_width_c-1 downto 0);
-SIGNAL remainder_rr:STD_LOGIC_VECTOR(register_width_c-1 downto 0);
-SIGNAL remainder_rrr:STD_LOGIC_VECTOR(register_width_c-1 downto 0);
-SIGNAL output:STD_LOGIC_VECTOR(register_width_c-1 downto 0);
-SIGNAL output_r:STD_LOGIC_VECTOR(register_width_c-1 downto 0);
-SIGNAL y_mul_inc:unsigned(register_width_c+1-1 downto 0);
-SIGNAL y_mul_round:std_logic_vector(register_width_c-1 downto 0);
+SIGNAL readdata2_r:STD_LOGIC_VECTOR(stream_register_width_c-1 downto 0);
+SIGNAL readdata_lookup:STD_LOGIC_VECTOR(2*stream_register_width_c-1 downto 0);
+SIGNAL readdata:STD_LOGIC_VECTOR(2*stream_register_width_c-1 downto 0);
+SIGNAL readdata_r:STD_LOGIC_VECTOR(stream_register_width_c-1 downto 0);
+SIGNAL readdata_rr:STD_LOGIC_VECTOR(stream_register_width_c-1 downto 0);
+SIGNAL readdata_rrr:STD_LOGIC_VECTOR(stream_register_width_c-1 downto 0);
+SIGNAL remainder:STD_LOGIC_VECTOR(stream_register_width_c-stream_lookup_depth2_c-1 downto 0);
+SIGNAL remainder_r:STD_LOGIC_VECTOR(stream_register_width_c-1 downto 0);
+SIGNAL remainder_rr:STD_LOGIC_VECTOR(stream_register_width_c-1 downto 0);
+SIGNAL remainder_rrr:STD_LOGIC_VECTOR(stream_register_width_c-1 downto 0);
+SIGNAL output:STD_LOGIC_VECTOR(stream_register_width_c-1 downto 0);
+SIGNAL output_r:STD_LOGIC_VECTOR(stream_register_width_c-1 downto 0);
+SIGNAL y_mul_inc:unsigned(stream_register_width_c+1-1 downto 0);
+SIGNAL y_mul_round:std_logic_vector(stream_register_width_c-1 downto 0);
+SIGNAL stream_input:STD_LOGIC_VECTOR(stream_register_width_c-1 downto 0);
+SIGNAL stream_output:STD_LOGIC_VECTOR(stream_register_width_c-1 downto 0);
+
+subtype saturation_retval_t is STD_LOGIC_VECTOR(stream_register_width_c-1 DOWNTO 0);
+function saturation(
+        input_in:std_logic_vector(register_width_c-1 downto 0))
+        return saturation_retval_t is
+variable output_v:std_logic_vector(stream_register_width_c-1 downto 0);
+constant all_zeros_c:std_logic_vector(register_width_c-stream_register_width_c+1-1 downto 0):=(others=>'0');
+constant all_ones_c:std_logic_vector(register_width_c-stream_register_width_c+1-1 downto 0):=(others=>'1');
 begin
+   if input_in(register_width_c-1)='0' then
+      -- This is a positive number
+      if input_in(register_width_c-1 downto stream_register_width_c-1)=all_zeros_c then
+         output_v := input_in(stream_register_width_c-1 downto 0);
+      else
+         output_v := std_logic_vector(to_unsigned(2**(stream_register_width_c-1)-1,stream_register_width_c)); -- Max positive nymber
+      end if;
+   else
+      if input_in(register_width_c-1 downto stream_register_width_c-1)=all_ones_c then
+         output_v := input_in(stream_register_width_c-1 downto 0);
+      else
+         output_v := std_logic_vector(to_unsigned(2**(stream_register_width_c-1),stream_register_width_c)); -- Smallest number
+      end if;
+   end if;
+return output_v;
+end function saturation;
+
+begin
+
+stream_input <= saturation(stream_input_in);
+
+stream_output_out(stream_output'length-1 downto 0) <= stream_output;
+
+stream_output_out(stream_output_out'length-1 downto stream_output'length) <= (others=>stream_output(stream_output'length-1));
 
 lookup_i:SPRAM
    GENERIC MAP (
        numwords_a=>2**(stream_lookup_depth_c),
        widthad_a=>stream_lookup_depth_c,
-       width_a=>2*register_width_c
+       width_a=>2*stream_register_width_c
     )
     PORT MAP (
        address_a=>address,
@@ -116,7 +150,7 @@ lookup_i:SPRAM
 mul_i:multiplier
 	generic map
 	(
-        DATA_WIDTH=>register_width_c,
+        DATA_WIDTH=>stream_register_width_c,
         REGISTER_OUTPUT=>FALSE
 	)
 	port map 
@@ -128,15 +162,15 @@ mul_i:multiplier
         z_out=>y_mul
 	);
 
-y_mul_inc <= unsigned(y_mul_r(register_width_c-stream_lookup_depth2_c+register_width_c-1 downto register_width_c-stream_lookup_depth2_c-1))+
-            to_unsigned(1,register_width_c+1);
+y_mul_inc <= unsigned(y_mul_r(stream_register_width_c-stream_lookup_depth2_c+stream_register_width_c-1 downto stream_register_width_c-stream_lookup_depth2_c-1))+
+            to_unsigned(1,stream_register_width_c+1);
 
 y_mul_round <= std_logic_vector(y_mul_inc(y_mul_inc'length-1 downto 1));
 
 adder_i : adder
    generic map
    (
-      DATA_WIDTH=>register_width_c
+      DATA_WIDTH=>stream_register_width_c
    )
    port map 
    (
@@ -146,13 +180,13 @@ adder_i : adder
       z_out=>output
    );
 
-output_out <= output_r;
+stream_output <= output_r;
 
-input <= std_logic_vector(stream_id_in) & input_in(register_width_c-1 downto register_width_c-stream_lookup_depth2_c);
+input <= std_logic_vector(stream_id_in) & stream_input(stream_register_width_c-1 downto stream_register_width_c-stream_lookup_depth2_c);
 
 address <= waddr_r when wena_r='1' else input;
 
-remainder <= input_in(register_width_c-stream_lookup_depth2_c-1 downto 0);
+remainder <= stream_input(stream_register_width_c-stream_lookup_depth2_c-1 downto 0);
 
 writedata <= writedata_r;
 
@@ -186,21 +220,22 @@ begin
     else
         if clock_in'event and clock_in='1' then
             stream_id_r <= stream_id_in;
-            input_r <= input_in;
+            input_r <= stream_input;
             y_mul_r <= y_mul;
             output_r <= output;
             remainder_r(remainder'length-1 downto 0) <= remainder;
-            remainder_r(register_width_c-1 downto remainder'length) <= (others=>'0');
+            remainder_r(stream_register_width_c-1 downto remainder'length) <= (others=>'0');
             remainder_rr <= remainder_r;
             remainder_rrr <= remainder_rr;
-            readdata2_r <= readdata(register_width_c-1 downto 0);
-            readdata_r <= readdata(2*register_width_c-1 downto register_width_c);
+            readdata2_r <= readdata(stream_register_width_c-1 downto 0);
+            readdata_r <= readdata(2*stream_register_width_c-1 downto stream_register_width_c);
             readdata_rr <= readdata_r;
             readdata_rrr <= readdata_rr;
             if config_in='1' then
                 waddr_r <= config_reg_in;
                 wena_r <= '1';
-                writedata_r <= config_data_in(2*register_width_c-1 downto 0);
+                writedata_r(stream_register_width_c-1 downto 0) <= config_data_in(stream_register_width_c-1 downto 0);
+                writedata_r(2*stream_register_width_c-1 downto stream_register_width_c) <= config_data_in(register_width_c+stream_register_width_c-1 downto register_width_c);
             else
                wena_r <= '0';
             end if;
