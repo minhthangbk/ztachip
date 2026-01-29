@@ -240,7 +240,7 @@ static void matmul_q4(void *_p,int pid) {
 
                _end_ = (ii==(cnt2-1))?0:(fast?':':'.');
 
-               >FPU.MAC(N=cnt,y=(y_type)ws->s4,A=(a_type)a,c=(bfloat *)s2,x1=(bfloat *)s1,x2=(bfloat *)s3) _end_;
+               >FPU.MAC(N=cnt,y=(y_type)ws->s4,A=(a_type)a,c=(bfloat *)s2,x1=(bfloat *)s1,x2=(zfloat *)s3) _end_;
          }
          ztaTaskYield();
       }
@@ -367,7 +367,7 @@ static void matmul_q8(void *_p,int pid) {
 
                _end_ = (ii==(cnt2-1))?0:(fast?':':'.');
 
-               >FPU.MAC(N=cnt,y=(y_type)ws->s4,A=(a_type)a,c=(bfloat *)s2,x1=(bfloat *)s1,x2=(bfloat *)s3) _end_;
+               >FPU.MAC(N=cnt,y=(y_type)ws->s4,A=(a_type)a,c=(bfloat *)s2,x1=(bfloat *)s1,x2=(zfloat *)s3) _end_;
          }
          ztaTaskYield();
       }

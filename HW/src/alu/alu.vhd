@@ -51,7 +51,7 @@ END alu;
 
 ARCHITECTURE behavior OF alu IS
 
-constant FP12_INT_WIDTH:integer:=21;
+constant FP12_INT_WIDTH:integer:=20;
 
 SIGNAL add_sub:STD_LOGIC;
 SIGNAL add_sub_r:STD_LOGIC;
@@ -192,7 +192,6 @@ begin
 
    if(mu_opcode_rrrr=mu_opcode_conv_c) then
       y3_r(fp12_value'length-1 downto 0) <= fp12_value;
-      y3_r(y3_r'length-1 downto fp12_value'length) <= (others=>'0');
    elsif(mu_opcode_rrrr=mu_opcode_lsb4_c) then
       y3_r(3 downto 0) <= y_shift_r(3 downto 0);
       y3_r(y3_r'length-1 downto 4) <= (others=>y_shift_r(3));

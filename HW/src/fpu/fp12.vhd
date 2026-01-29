@@ -38,7 +38,7 @@ use work.ztachip_pkg.all;
 
 ENTITY fp12 IS
     GENERIC (
-        INT_WIDTH : integer -- Width of integer to be converted tp float 12bit
+        INT_WIDTH : integer -- Width of integer to be converted tp float 16bit
     );
     port(
         SIGNAL clock_in    : IN STD_LOGIC;

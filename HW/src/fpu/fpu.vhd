@@ -116,6 +116,8 @@ record
     Y_double:std_logic;
     C_double:std_logic;
     C2_double:std_logic;
+    X_type:register2_t;
+    Y_type:register2_t;
 end record;
 
 signal fpu_instruction_r:fpu_instruction_t;
@@ -158,7 +160,9 @@ constant fpu_instruction_len_c:integer:=fpu_instruction_r.opcode'length+
                                         1+ --fpu_instruction_r.X_double
                                         1+ --fpu_instruction_r.Y_double
                                         1+ --fpu_instruction_r.C_double
-                                        1; --fpu_instruction_r.C2_double 
+                                        1+ --fpu_instruction_r.C2_double
+                                        register2_t'length+ --fpu_instruction_r.X_type
+                                        register2_t'length; --fpu_instruction_r.Y_type
 
 subtype fpu_instruction_rec_t is std_logic_vector(fpu_instruction_len_c-1 downto 0);
 
@@ -240,7 +244,11 @@ begin
     rec_v.C_double := q_in(q_in'length-len_v-1);
     len_v := len_v + 1; 
     rec_v.C2_double := q_in(q_in'length-len_v-1);
-    len_v := len_v + 1;  
+    len_v := len_v + 1;
+    rec_v.X_type := unsigned(q_in(q_in'length-len_v-1 downto q_in'length-len_v-rec_v.X_type'length));
+    len_v := len_v + rec_v.X_type'length;
+    rec_v.Y_type := unsigned(q_in(q_in'length-len_v-1 downto q_in'length-len_v-rec_v.Y_type'length));
+    len_v := len_v + rec_v.Y_type'length;
     return rec_v;
 end unpack_instruction;
 
@@ -328,8 +336,82 @@ begin
    len_v := len_v + 1;
    q_v(q_v'length-len_v-1) := rec_in.C2_double;
    len_v := len_v + 1;
+   q_v(q_v'length-len_v-1 downto q_v'length-len_v-rec_in.X_type'length) := std_logic_vector(rec_in.X_type);
+   len_v := len_v + rec_in.X_type'length;
+   q_v(q_v'length-len_v-1 downto q_v'length-len_v-rec_in.Y_type'length) := std_logic_vector(rec_in.Y_type);
+   len_v := len_v + rec_in.Y_type'length;
    return q_v;
 end pack_instruction;
+
+----
+-- Convert proprietary float format to float32
+----
+
+subtype zfp2float_retval_t is std_logic_vector(31 downto 0);
+function zfp2float(
+        int_in:std_logic_vector(15 downto 0)) 
+        return zfp2float_retval_t is
+variable float_v:std_logic_vector(31 downto 0);
+variable exp_v:std_logic_vector(7 downto 0);
+variable mantissa_v:std_logic_vector(fp12_mantissa_width_c-1 downto 0);
+begin
+   exp_v(fp12_exp_width_c-1 downto 0) := int_in(14 downto 14-fp12_exp_width_c+1);
+   exp_v(7 downto fp12_exp_width_c) := (others=>'0');
+   mantissa_v := int_in(fp12_mantissa_width_c-1 downto 0);
+   if(exp_v=std_logic_vector(to_unsigned(0,exp_v'length))) then
+      if(mantissa_v=std_logic_vector(to_unsigned(0,fp12_mantissa_width_c))) then
+         float_v := (others=>'0');
+      else
+         float_v(31) := int_in(15);
+         float_v(30 downto 0) := (others=>'0');
+         if mantissa_v(11) = '1' then
+            float_v(22 downto 12) := mantissa_v(10 downto 0);
+            float_v(30 downto 23) := std_logic_vector(to_unsigned(138,8));
+         elsif mantissa_v(10) = '1' then
+            float_v(22 downto 13) := mantissa_v(9 downto 0);
+            float_v(30 downto 23) := std_logic_vector(to_unsigned(137,8));
+         elsif mantissa_v(9) = '1' then
+            float_v(22 downto 14) := mantissa_v(8 downto 0);
+            float_v(30 downto 23) := std_logic_vector(to_unsigned(136,8));
+         elsif mantissa_v(8) = '1' then
+            float_v(22 downto 15) := mantissa_v(7 downto 0);
+            float_v(30 downto 23) := std_logic_vector(to_unsigned(135,8));
+         elsif mantissa_v(7) = '1' then
+            float_v(22 downto 16) := mantissa_v(6 downto 0);
+            float_v(30 downto 23) := std_logic_vector(to_unsigned(134,8));
+         elsif mantissa_v(6) = '1' then
+            float_v(22 downto 17) := mantissa_v(5 downto 0);
+            float_v(30 downto 23) := std_logic_vector(to_unsigned(133,8));
+         elsif mantissa_v(5) = '1' then
+            float_v(22 downto 18) := mantissa_v(4 downto 0);
+            float_v(30 downto 23) := std_logic_vector(to_unsigned(132,8));
+         elsif mantissa_v(4) = '1' then
+            float_v(22 downto 19) := mantissa_v(3 downto 0);
+            float_v(30 downto 23) := std_logic_vector(to_unsigned(131,8));
+         elsif mantissa_v(3) = '1' then
+            float_v(22 downto 20) := mantissa_v(2 downto 0);
+            float_v(30 downto 23) := std_logic_vector(to_unsigned(130,8));
+         elsif mantissa_v(2) = '1' then
+            float_v(22 downto 21) := mantissa_v(1 downto 0);
+            float_v(30 downto 23) := std_logic_vector(to_unsigned(129,8));
+         elsif mantissa_v(1) = '1' then
+            float_v(22 downto 22) := mantissa_v(0 downto 0);
+            float_v(30 downto 23) := std_logic_vector(to_unsigned(128,8));
+         elsif mantissa_v(0) = '1' then
+            float_v(30 downto 23) := std_logic_vector(to_unsigned(127,8));
+         else
+            float_v := (others=>'0');
+         end if;
+      end if;
+   else
+      float_v(31) := int_in(15); -- Sign bit
+      float_v(30 downto 23) := std_logic_vector(unsigned(exp_v)+to_unsigned(126+fp12_mantissa_width_c,8));
+      float_v(22 downto 22-fp12_mantissa_width_c+1) := mantissa_v;
+      float_v(22-fp12_mantissa_width_c downto 0) := (others=>'0');
+   end if;
+   return float_v;
+end function zfp2float;
+
 
 constant CMD_FIFO_DEPTH:integer:=8;
 
@@ -807,8 +889,8 @@ end process;
 
 process(fpu_instruction_r,X,step_r)
 variable step_v:unsigned(2 downto 0);
+variable x_v:std_logic_vector(15 downto 0);
 begin
---VUONG
 if(fpu_instruction_r.X_enable='1') then
     if(fpu_instruction_r.X_by_value='0') then
         if(fpu_instruction_r.X_double='0') then
@@ -816,14 +898,19 @@ if(fpu_instruction_r.X_enable='1') then
             step_v(1 downto 0) := step_r(1 downto 0)+unsigned(fpu_instruction_r.X_addr(2 downto 1));
             case step_v(1 downto 0) is
                 when "00" =>
-                    exe_x <= X(15 downto 0) & "0000000000000000";
+                    x_v := X(15 downto 0);
                 when "01" =>
-                    exe_x <= X(31 downto 16) & "0000000000000000";
+                    x_v := X(31 downto 16);
                 when "10" =>
-                    exe_x <= X(47 downto 32) & "0000000000000000";
+                    x_v := X(47 downto 32);
                 when others =>
-                    exe_x <= X(63 downto 48) & "0000000000000000";
+                    x_v := X(63 downto 48);
             end case;
+            if(fpu_instruction_r.X_type=register2_fpu_set_W_ZFP16) then
+                exe_x <= zfp2float(x_v);
+            else
+                exe_x <= x_v & "0000000000000000";
+            end if;
         else
             step_v := (others=>'0');
             step_v(0 downto 0) := step_r(0 downto 0)+unsigned(fpu_instruction_r.X_addr(2 downto 2));
@@ -844,6 +931,7 @@ end process;
 
 process(fpu_instruction_r,Y,step_r)
 variable step_v:unsigned(2 downto 0);
+variable y_v:std_logic_vector(15 downto 0);
 begin
 if(fpu_instruction_r.Y_enable='1') then
     if(fpu_instruction_r.Y_by_value='0') then
@@ -852,14 +940,19 @@ if(fpu_instruction_r.Y_enable='1') then
             step_v(1 downto 0) := step_r(1 downto 0)+unsigned(fpu_instruction_r.Y_addr(2 downto 1));
             case step_v(1 downto 0) is
                 when "00" =>
-                    exe_y <= Y(15 downto 0) & "0000000000000000";
+                    y_v := Y(15 downto 0);
                 when "01" =>
-                    exe_y <= Y(31 downto 16) & "0000000000000000";
+                    y_v := Y(31 downto 16);
                 when "10" =>
-                    exe_y <= Y(47 downto 32) & "0000000000000000";
+                    y_v := Y(47 downto 32);
                 when others =>
-                    exe_y <= Y(63 downto 48) & "0000000000000000";
+                    y_v := Y(63 downto 48);
             end case;
+            if(fpu_instruction_r.Y_type=register2_fpu_set_W_ZFP16) then
+                exe_y <= zfp2float(y_v);
+            else
+                exe_y <= y_v & "0000000000000000";
+            end if;
         else
             step_v := (others=>'0');
             step_v(0 downto 0) := step_r(0 downto 0)+unsigned(fpu_instruction_r.Y_addr(2 downto 2));
@@ -1104,7 +1197,6 @@ if(exe='1') then
         fpu_instruction_r.opcode=register2_fpu_exe_inv_sqrt_c or
         fpu_instruction_r.opcode=register2_fpu_exe_exp_c) then
         A_addr <= fpu_instruction_r.A_addr + resize(fpu_instruction_r.A_precision,fpu_instruction_r.A_addr'length);
---VUONG
     elsif (fpu_instruction_r.opcode=register2_fpu_exe_group_max_c) then
         if((std_logic_vector(step_r) and fpu_instruction_r.C(step_r'length-1 downto 0)) = fpu_instruction_r.C(step_r'length-1 downto 0)) then
             A_addr <= fpu_instruction_r.A_addr + resize(fpu_instruction_r.A_precision,fpu_instruction_r.A_addr'length);
@@ -1323,6 +1415,8 @@ begin
         fpu_instruction_r.Y_double <= '0';
         fpu_instruction_r.C_double <= '0';
         fpu_instruction_r.C2_double <= '0';
+        fpu_instruction_r.X_type <= (others=>'0');
+        fpu_instruction_r.Y_type <= (others=>'0');
 
         fpu_next_instruction_r.opcode <= (others=>'0');  
         fpu_next_instruction_r.A_addr <= (others=>'0');
@@ -1359,6 +1453,8 @@ begin
         fpu_next_instruction_r.Y_double <= '0';
         fpu_next_instruction_r.C_double <= '0';
         fpu_next_instruction_r.C2_double <= '0';
+        fpu_next_instruction_r.X_type <= (others=>'0');
+        fpu_next_instruction_r.Y_type <= (others=>'0');
 
         B_pending_r <= (others=>'0');
         X_pending_r <= (others=>'0');
@@ -1512,7 +1608,7 @@ begin
                         fpu_next_instruction_r.A_addr <= page_vm;
                         if(fpu_set_W=register2_fpu_set_W_FP32) then
                             fpu_next_instruction_r.A_precision <= to_unsigned(4,fpu_next_instruction_r.A_precision'length); --FP32
-                        elsif(fpu_set_W=register2_fpu_set_W_FP16) then
+                        elsif(fpu_set_W=register2_fpu_set_W_FP16 or fpu_set_W=register2_fpu_set_W_ZFP16) then
                             fpu_next_instruction_r.A_precision <= to_unsigned(2,fpu_next_instruction_r.A_precision'length); --FP16
                         elsif(fpu_set_W=register2_fpu_set_W_INT8) then
                             fpu_next_instruction_r.A_precision <= to_unsigned(1,fpu_next_instruction_r.A_precision'length); -- INT8
@@ -1522,8 +1618,10 @@ begin
                     elsif(fpu_set_P=register2_fpu_set_P_B) then
                         if(fpu_set_M=register2_fpu_set_M_VALUE) then
                             fpu_next_instruction_r.B_addr <= (others=>'0');
-                            if(fpu_set_W=register2_fpu_set_W_FP16) then
+                            if(fpu_set_W=register2_fpu_set_W_FP16 ) then
                                 fpu_next_instruction_r.B <= bus_writedata_in(fp16_t'length-1 downto 0) & "0000000000000000";
+                            elsif(fpu_set_W=register2_fpu_set_W_ZFP16 ) then
+                                fpu_next_instruction_r.B <= bus_writedata_in(fp12_t'length-1 downto 0) & "0000000000000000";
                             else
                                 fpu_next_instruction_r.B <= bus_writedata_in;
                             end if;
@@ -1535,7 +1633,7 @@ begin
                         end if;
                         if(fpu_set_W=register2_fpu_set_W_INT8) then
                             fpu_next_instruction_r.B_precision <= to_unsigned(1,fpu_next_instruction_r.B_precision'length);                    
-                        elsif(fpu_set_W=register2_fpu_set_W_FP16) then
+                        elsif(fpu_set_W=register2_fpu_set_W_FP16 or fpu_set_W=register2_fpu_set_W_ZFP16) then
                             fpu_next_instruction_r.B_precision <= to_unsigned(2,fpu_next_instruction_r.B_precision'length);
                         else
                             fpu_next_instruction_r.B_precision <= to_unsigned(4,fpu_next_instruction_r.B_precision'length);
@@ -1546,6 +1644,8 @@ begin
                             fpu_next_instruction_r.C_addr <= (others=>'0');
                             if(fpu_set_W=register2_fpu_set_W_FP16) then
                                 fpu_next_instruction_r.C <= bus_writedata_in(fp16_t'length-1 downto 0) & "0000000000000000";
+                            elsif(fpu_set_W=register2_fpu_set_W_ZFP16) then
+                                fpu_next_instruction_r.C <= bus_writedata_in(fp12_t'length-1 downto 0) & "0000000000000000";
                             else
                                 fpu_next_instruction_r.C <= bus_writedata_in(fp32_t'length-1 downto 0);
                             end if;
@@ -1559,7 +1659,7 @@ begin
                             fpu_next_instruction_r.C_pending <= '0';
                             fpu_next_instruction_r.C_enable <= '1';
                         end if;
-                        if(fpu_set_W=register2_fpu_set_W_FP16) then
+                        if(fpu_set_W=register2_fpu_set_W_FP16 or fpu_set_W=register2_fpu_set_W_ZFP16) then
                             fpu_next_instruction_r.C_double <= '0';
                         else
                             fpu_next_instruction_r.C_double <= '1';
@@ -1569,6 +1669,8 @@ begin
                             fpu_next_instruction_r.C2_addr <= (others=>'0');
                             if(fpu_set_W=register2_fpu_set_W_FP16) then
                                 fpu_next_instruction_r.C2 <= bus_writedata_in(fp16_t'length-1 downto 0) & "0000000000000000";
+                            elsif(fpu_set_W=register2_fpu_set_W_ZFP16) then
+                                fpu_next_instruction_r.C2 <= bus_writedata_in(fp12_t'length-1 downto 0) & "0000000000000000";
                             else
                                 fpu_next_instruction_r.C2 <= bus_writedata_in(fp32_t'length-1 downto 0);
                             end if;
@@ -1582,7 +1684,7 @@ begin
                             fpu_next_instruction_r.C2_pending <= '0';
                             fpu_next_instruction_r.C2_enable <= '1';
                         end if;
-                        if(fpu_set_W=register2_fpu_set_W_FP16) then
+                        if(fpu_set_W=register2_fpu_set_W_FP16 or fpu_set_W=register2_fpu_set_W_ZFP16) then
                             fpu_next_instruction_r.C2_double <= '0';
                         else
                             fpu_next_instruction_r.C2_double <= '1';
@@ -1592,6 +1694,8 @@ begin
                             fpu_next_instruction_r.X_addr <= (others=>'0');
                             if(fpu_set_W=register2_fpu_set_W_FP16) then
                                 fpu_next_instruction_r.X <= bus_writedata_in(fp16_t'length-1 downto 0) & "0000000000000000";
+                            elsif(fpu_set_W=register2_fpu_set_W_ZFP16) then
+                                fpu_next_instruction_r.X <= bus_writedata_in(fp12_t'length-1 downto 0) & "0000000000000000";
                             else
                                 fpu_next_instruction_r.X <= bus_writedata_in(fp32_t'length-1 downto 0);
                             end if;
@@ -1603,16 +1707,19 @@ begin
                             fpu_next_instruction_r.X_enable <= '1';
                             fpu_next_instruction_r.X_by_value <= '0';
                         end if;
-                        if(fpu_set_W = register2_fpu_set_W_FP16) then
+                        if(fpu_set_W = register2_fpu_set_W_FP16 or fpu_set_W = register2_fpu_set_W_ZFP16) then
                             fpu_next_instruction_r.X_double <= '0';
                         else
                             fpu_next_instruction_r.X_double <= '1';
                         end if;
+                        fpu_next_instruction_r.X_type <= fpu_set_W;
                     elsif(fpu_set_P=register2_fpu_set_P_Y) then
                         if(fpu_set_M = register2_fpu_set_M_VALUE) then
                             fpu_next_instruction_r.Y_addr <= (others=>'0');
                             if(fpu_set_W=register2_fpu_set_W_FP16) then
                                 fpu_next_instruction_r.Y <= bus_writedata_in(fp16_t'length-1 downto 0) & "0000000000000000";
+                            elsif(fpu_set_W=register2_fpu_set_W_ZFP16) then
+                                fpu_next_instruction_r.Y <= bus_writedata_in(fp12_t'length-1 downto 0) & "0000000000000000";
                             else
                                 fpu_next_instruction_r.Y <= bus_writedata_in(fp32_t'length-1 downto 0);
                             end if;
@@ -1624,7 +1731,8 @@ begin
                             fpu_next_instruction_r.Y_enable <= '1';
                             fpu_next_instruction_r.Y_by_value <= '0';
                         end if;
-                        if(fpu_set_W = register2_fpu_set_W_FP16) then
+                        fpu_next_instruction_r.Y_type <= fpu_set_W;
+                        if(fpu_set_W = register2_fpu_set_W_FP16 or fpu_set_W = register2_fpu_set_W_ZFP16) then
                             fpu_next_instruction_r.Y_double <= '0';
                         else
                             fpu_next_instruction_r.Y_double <= '1';

@@ -502,6 +502,8 @@
 
 #define FPU_SET_W_INT8   32
 
+#define FPU_SET_W_ZFP16  48
+
 #define FPU_SET_M_VALUE  0
 
 #define FPU_SET_M_ADDR   8

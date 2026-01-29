@@ -648,15 +648,15 @@ type vector_forks_t is array(natural range <>) of vector_fork_t;
 -- Floating point type definition
 -------
 
-constant fp12_exp_width_c:integer:=4;
+constant fp12_exp_width_c:integer:=3;
 
-constant fp12_mantissa_width_c:integer:=7;
+constant fp12_mantissa_width_c:integer:=12;
 
 constant fp32_exp_width_c:integer:=8;
 
 constant fp32_mantissa_width_c:integer:=23;
 
-subtype fp12_t is std_logic_vector(11 downto 0); 
+subtype fp12_t is std_logic_vector(15 downto 0); 
 
 subtype fp16_t is std_logic_vector(15 downto 0);
 
@@ -1072,7 +1072,7 @@ constant register_vm_toggle_c                   :integer:=9;  -- Toggle current 
 --    P: Paramter
 --    M: mode; 0=value;1=address
 --    W: 0=fp16;1=fp32;2=int8;3=fp32-floor
--- Register bit field has this format: M W A PPP 
+-- Register bit field has this format: WW M PPP 
 ---------------------
 constant register2_fpu_set_P_MASK       :std_logic_vector:="000111"; -- Bit mask for P subfield
 constant register2_fpu_set_M_MASK       :std_logic_vector:="001000"; -- Bit mask for M subfield 
@@ -1087,6 +1087,7 @@ constant register2_fpu_set_P_C2         :integer:=6; -- P subfield to set C2 par
 constant register2_fpu_set_W_FP16       :integer:=0; -- W subfield for FP16 data type
 constant register2_fpu_set_W_FP32       :integer:=16; -- W subfield for FP32 data type.
 constant register2_fpu_set_W_INT8       :integer:=32; -- W subfield for INT8 data type.
+constant register2_fpu_set_W_ZFP16      :integer:=48; -- W subfield for ztachip custom FP16
 constant register2_fpu_set_M_VALUE      :integer:=0; -- M subfield for access by value
 constant register2_fpu_set_M_ADDR       :integer:=8; -- M subfield for access by SRAM address
 -------
@@ -5583,4 +5584,5 @@ package body ztachip_pkg is
     end function;
 
 end package body ztachip_pkg;
+
 
