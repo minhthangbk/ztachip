@@ -156,13 +156,13 @@ signal exp_delay:fp32_t;
 
 BEGIN
 
-X <= X_in when (input_ena_in='1') else (others=>'0');
+X <= X_in;
 
-Y <= Y_in when (input_ena_in='1') else (others=>'0');
+Y <= Y_in;
 
-C <= C_in when (input_ena_in='1') else (others=>'0');
+C <= C_in;
 
-B <= B_in when (input_ena_in='1') else (others=>'0');
+B <= B_in;
 
 process(clock_in,reset_in)
 begin

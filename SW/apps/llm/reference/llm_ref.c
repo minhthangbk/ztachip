@@ -100,9 +100,9 @@ void kernel_ref_llm_matmul_q4_exe(
             sum = 0;
             for(uint32_t k=0;k < GS_DEFAULT;k+=2) {
                 hi = (w_v[WV(i*N/2+(j+k)/2,sz,sz2,reshape)] >> 4) & 0x0F;
-                hi = (hi & 0x8)?(hi |= 0xF0):hi;
+                hi = (hi & 0x8)?(hi|0xF0):hi;
                 lo = (w_v[WV(i*N/2+(j+k)/2,sz,sz2,reshape)] & 0x0F);
-                lo = (lo & 0x8)?(lo |= 0xF0):lo;
+                lo = (lo & 0x8)?(lo|0xF0):lo;
                 sum += ((int32_t)((int8_t)lo))*((int32_t)((int8_t)x_v[j+k]));
                 sum += ((int32_t)((int8_t)hi))*((int32_t)((int8_t)x_v[j+k+1]));
             }

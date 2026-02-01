@@ -1214,6 +1214,20 @@ constant apb_time_get_c:integer:=76;
 
 constant apb_time2_get_c:integer:=80;
 
+
+constant apb_spi_config:integer:=84;
+
+constant apb_spi_status:integer:=88;
+
+constant apb_spi_read_req:integer:=92;
+
+constant apb_spi_read:integer:=96;
+
+constant apb_spi_write_req:integer:=100;
+
+constant apb_spi_write:integer:=104;
+
+
 ---------------------------------------------------------------------------
 --                       Function definition
 -------------------------------------------------------------------------

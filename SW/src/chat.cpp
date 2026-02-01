@@ -57,7 +57,7 @@ static char *getInput()
                 if(inputLen > 0)
                     inputLen--;
             } else {
-                if(inputLen < (sizeof(input)-1)) {
+                if(inputLen < (int)(sizeof(input)-1)) {
                     input[inputLen++]=ch;
                 }
             } 

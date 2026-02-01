@@ -229,7 +229,7 @@ static void matmul_q4(void *_p,int pid) {
                
                y_type = ((ii==(cnt2-1) && (x+NUM_PCORE)>=N)?FPU_SET_W_FP16:FPU_SET_W_FP32)|FPU_SET_M_ADDR;
                a_type = (((x==0) && (ii==0))?FPU_SET_M_VALUE:FPU_SET_M_ADDR)|FPU_SET_W_FP32;
-               a = ((x==0) && (ii==0))?0:ws->s4;
+               a = (uint32_t)(((x==0) && (ii==0))?0:ws->s4);
 
                // SPU instructions are grouped together for better performance
                // When _end_ = 0, it means the end of a group of SPU instructions
@@ -356,7 +356,7 @@ static void matmul_q8(void *_p,int pid) {
 
                a_type = (((x==0) && (ii==0))?FPU_SET_M_VALUE:FPU_SET_M_ADDR)|FPU_SET_W_FP32;
 
-               a = ((x==0) && (ii==0))?0:ws->s4;
+               a = (uint32_t)(((x==0) && (ii==0))?0:ws->s4);
 
                // SPU instructions are grouped together for better performance
                // When _end_ = 0, it means the end of a group of SPU instructions
@@ -523,7 +523,7 @@ void kernel_llm_quantize_exe(int reqId,int N,float16_t *x,float16_t *s,uint8_t *
 
       // Scale the group to INT8
 
-      for (m = 0,qy=ws->y2,qc=ws->y,qx=ws->x2; 
+      for (m = 0,qy=(uint32_t)(ws->y2),qc=(uint32_t)(ws->y),qx=(uint32_t)(ws->x2); 
            m < cnt2;
            m++,qy+=GS,qc+=4,qx+=GS*2) {
          group = j+m;
@@ -635,7 +635,7 @@ static void llm_dot_product_exe(void *_p,int pid)
 
          for(k=0;k < cnt2;k++,sum += 4,x2 += DOT_PRODUCT_BATCH*2)
          {
-            y = last?&ws->sum2[k]:sum; 
+            y = last?(uint32_t)(&ws->sum2[k]):sum; 
 
             yfmt = ((last)?FPU_SET_W_FP16:FPU_SET_W_FP32)|FPU_SET_M_ADDR; 
             
@@ -772,7 +772,7 @@ static void llm_dot_product2_exe(void *_p,int pid)
 
          for(i=0;i < cnt2;i++,sum+=4,x2+=DOT_PRODUCT_K_BATCH*2)
          {
-            y = last?&ws->sram_sum2[i]:sum;
+            y = last?(uint32_t)(&ws->sram_sum2[i]):sum;
 
             yfmt = ((last)?FPU_SET_W_FP16:FPU_SET_W_FP32)|FPU_SET_M_ADDR; 
 
@@ -1449,7 +1449,7 @@ static int find_max(uint16_t *x,int N)
 {
    float f;
    float max=0;
-   int i,found; 
+   int i,found=0; 
    
    for(i=0;i < N;i++,x++) {
       f = BF2F(*x);
@@ -1574,7 +1574,7 @@ int kernel_llm_find_k_max(float16_t *x,uint32_t _N,int K, int *top,float *topp) 
 int kernel_llm_find_max(float16_t *x,uint32_t N) {
    uint32_t i,cnt,cnt2;
    float max;
-   int maxi;
+   int maxi=0;
    int group;
    int numGroup;
    find_max_ws *ws=(find_max_ws *)0;
@@ -1629,9 +1629,9 @@ int kernel_llm_find_max(float16_t *x,uint32_t N) {
 
    FLUSH_DATA_CACHE();
 
-   group = find_max(&ws2->y[0],cnt/MAX_GROUP_SZ);
+   group = find_max((uint16_t *)(&ws2->y[0]),cnt/MAX_GROUP_SZ);
 
-   return maxi+group*MAX_GROUP_SZ+find_max(&ws2->x[group*MAX_GROUP_SZ],MAX_GROUP_SZ); 
+   return maxi+group*MAX_GROUP_SZ+find_max((uint16_t *)(&ws2->x[group*MAX_GROUP_SZ]),MAX_GROUP_SZ); 
 }
 
 //--------------------------------------------------------------------------

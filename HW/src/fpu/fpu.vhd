@@ -572,21 +572,25 @@ signal write_flush_r:std_logic;
 
 signal fpu_exe_pending_r:std_logic_vector(1 downto 0);
 
+signal fpu_busy_vm_r:std_logic_vector(1 downto 0);
+
+signal full:std_logic;
+
 BEGIN
+
+full <= cmd_fifo_full(0) or cmd_fifo_full(1);
 
 fpu_exe_out <= exe;
 
 busy <= (busy_r or busy_rr or fpu_exe_r or fpu_exe_rr);
 
-fpu_busy_vm_out(0) <= (busy and (not fpu_vm_r)) or fpu_exe_pending_r(0);
-
-fpu_busy_vm_out(1) <= (busy and (fpu_vm_r)) or fpu_exe_pending_r(1);
+fpu_busy_vm_out <= fpu_busy_vm_r;
 
 bus_readdata_out <= rresp_r when rden_r='1' else (others=>'Z');
 
 bus_readdatavalid_out <= rden_r;
 
-bus_writewait_out <= '1' when (bus_write_in='1' and cmd_fifo_we="00" and wregno=to_unsigned(register_fpu_exe_c,register_t'length)) else '0';
+bus_writewait_out <= '1' when (bus_write_in='1' and full='1' and wregno=to_unsigned(register_fpu_exe_c,register_t'length)) else '0';
 
 bus_readwait_out <= '0';
 
@@ -831,7 +835,7 @@ Y_fifo_i:scfifo
 
 -- Command FIFO 
 
-process(fpu_next_instruction_r,bus_writedata_in,wregno2,bus_write_in,wregno,cmd_fifo_full,
+process(fpu_next_instruction_r,bus_writedata_in,wregno2,bus_write_in,wregno,full,
         fpu_vm_r,ready,cmd_fifo_empty,halt_r,cmd_fifo_reads)
 begin
 if(vm_r='0') then
@@ -841,7 +845,7 @@ if(vm_r='0') then
                                         wregno2(fpu_opcode_t'length+1) --abs
                                         );
 
-    if(bus_write_in='1' and wregno=to_unsigned(register_fpu_exe_c,register_t'length) and cmd_fifo_full(0)='0') then
+    if(bus_write_in='1' and wregno=to_unsigned(register_fpu_exe_c,register_t'length) and full='0') then
         cmd_fifo_we(0) <= '1';
     else 
         cmd_fifo_we(0) <= '0'; 
@@ -858,7 +862,7 @@ else
                                         wregno2(fpu_opcode_t'length), --floor
                                         wregno2(fpu_opcode_t'length+1) --abs
                                         );
-    if(bus_write_in='1' and wregno=to_unsigned(register_fpu_exe_c,register_t'length) and cmd_fifo_full(1)='0') then
+    if(bus_write_in='1' and wregno=to_unsigned(register_fpu_exe_c,register_t'length) and full='0') then
         cmd_fifo_we(1) <= '1';
     else
         cmd_fifo_we(1) <= '0';
@@ -1374,6 +1378,10 @@ begin
 end process;
 
 process(clock_in,reset_in)
+variable busy_v:std_logic;
+variable fpu_exe_v:std_logic;
+variable fpu_vm_v:std_logic;
+variable fpu_exe_pending_v:std_logic_vector(1 downto 0);
 begin
     if reset_in = '0' then
         halt_r <= '1';
@@ -1481,8 +1489,15 @@ begin
         page_vm1_r <= (others=>'0');
         write_flush_r <= '0';
         fpu_exe_pending_r <= (others=>'0');
+        fpu_busy_vm_r <= (others=>'0');
     else
         if clock_in'event and clock_in='1' then
+
+            busy_v := busy_r;
+            fpu_exe_v := fpu_exe_r;
+            fpu_vm_v := fpu_vm_r;
+            fpu_exe_pending_v := fpu_exe_pending_r;
+
             fpu_readdatavalid_r <= fpu_readdatavalid_in;
             fpu_readdatavalid_rr <= fpu_readdatavalid_r;
             halt_r <= halt;
@@ -1494,7 +1509,6 @@ begin
             sram_write_r <= sram_write;
             sram_writedata_r <= sram_writedata;
             sram_writebe_r <= sram_writebe;
-            busy_rr <= busy_r;
 
             -- Latch in write request so to combine with next write
             -- requests
@@ -1556,41 +1570,40 @@ begin
 
             if(fpu_exe_in='1') then
                 if(fpu_exe_vm_in='0') then
-                  fpu_exe_pending_r(0) <= '1'; 
+                  fpu_exe_pending_v(0) := '1'; 
                 else
-                  fpu_exe_pending_r(1) <= '1'; 
+                  fpu_exe_pending_v(1) := '1'; 
                 end if;
             end if;
             if(busy='0') then
                 if(fpu_vm_r='0') then
                     if(fpu_exe_pending_r(1)='1') then
-                        fpu_exe_r <= '1';
-                        fpu_vm_r <= '1';
-                        fpu_exe_pending_r(1) <= '0'; 
+                        fpu_exe_v := '1';
+                        fpu_vm_v := '1';
+                        fpu_exe_pending_v(1) := '0'; 
                     elsif(fpu_exe_pending_r(0)='1') then
-                        fpu_exe_r <= '1';
-                        fpu_vm_r <= '0';
-                        fpu_exe_pending_r(0) <= '0'; 
+                        fpu_exe_v := '1';
+                        fpu_vm_v := '0';
+                        fpu_exe_pending_v(0) := '0'; 
                     else
-                        fpu_exe_r <= '0';
+                        fpu_exe_v := '0';
                     end if;
                 else
                     if(fpu_exe_pending_r(0)='1') then
-                        fpu_exe_r <= '1';
-                        fpu_vm_r <= '0';
-                        fpu_exe_pending_r(0) <= '0'; 
+                        fpu_exe_v := '1';
+                        fpu_vm_v := '0';
+                        fpu_exe_pending_v(0) := '0'; 
                     elsif(fpu_exe_pending_r(1)='1') then
-                        fpu_exe_r <= '1';
-                        fpu_vm_r <= '1';
-                        fpu_exe_pending_r(1) <= '0'; 
+                        fpu_exe_v := '1';
+                        fpu_vm_v := '1';
+                        fpu_exe_pending_v(1) := '0'; 
                     else
-                        fpu_exe_r <= '0';
+                        fpu_exe_v := '0';
                     end if;
                 end if;
             else
-                fpu_exe_r <= '0';     
+                fpu_exe_v := '0';     
             end if;
-            fpu_exe_rr <= fpu_exe_r;
             if(bus_write_in='1') then
                 if wregno=register_vm_toggle_c then
                     vm_r <= not vm_r;
@@ -1745,7 +1758,7 @@ begin
 
             if(cmd_fifo_rd/="00") then
                 running_r <= '1';
-                busy_r <= '1';
+                busy_v := '1';
                 step_r <= (others=>'0');
                 fpu_instruction_r <= fpu_instruction;
             end if;
@@ -1766,7 +1779,7 @@ begin
             end if;
 
             if(fpu_write='1' and fpu_eof='1' and fpu_last='1') then
-                busy_r <= '0';
+                busy_v := '0';
             end if;
 
             ------
@@ -1785,8 +1798,16 @@ begin
             else
                 rden_r <= '0';
             end if;
+            busy_rr <= busy_r;
+            busy_r <= busy_v;
+            fpu_exe_rr <= fpu_exe_r;
+            fpu_exe_r <= fpu_exe_v;
+            fpu_vm_r <= fpu_vm_v;
+            fpu_exe_pending_r <= fpu_exe_pending_v;
+            fpu_busy_vm_r(0) <= ((busy_v or busy_r or fpu_exe_v or fpu_exe_r) and (not fpu_vm_v)) or fpu_exe_pending_v(0);
+            fpu_busy_vm_r(1) <= ((busy_v or busy_r or fpu_exe_v or fpu_exe_r) and (fpu_vm_v)) or fpu_exe_pending_v(1);
+
         end if;
     end if;
 end process;
-
 END behavior;
