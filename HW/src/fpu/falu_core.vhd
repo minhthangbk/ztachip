@@ -51,6 +51,7 @@ ENTITY falu_core IS
         SIGNAL input_fast_in        : IN STD_LOGIC;
         SIGNAL A_addr               : IN unsigned(sram_depth_c-1 DOWNTO 0);
         SIGNAL A_precision          : IN unsigned(2 downto 0);
+        SIGNAL A_int                : IN STD_LOGIC;
         SIGNAL A_floor              : IN STD_LOGIC;
         SIGNAL A_abs                : IN STD_LOGIC;
         SIGNAL B_in                 : IN fp32_t;
@@ -120,6 +121,7 @@ SIGNAL input_last_r:STD_LOGIC;
 SIGNAL input_fast_r:STD_LOGIC;
 SIGNAL A_addr_r:unsigned(sram_depth_c-1 DOWNTO 0);
 SIGNAL A_precision_r:unsigned(2 downto 0);
+SIGNAL A_int_r:STD_LOGIC;
 SIGNAL A_floor_r:STD_LOGIC;
 SIGNAL A_abs_r:STD_LOGIC;
 SIGNAL B_r:fp32_t;
@@ -143,6 +145,7 @@ begin
         A_precision_r <= (others=>'0');
         A_floor_r <= '0';
         A_abs_r <= '0';
+        A_int_r <= '0';
         B_r <= (others=>'0');
         C_r <= (others=>'0');
         C2_r <= (others=>'0');
@@ -160,6 +163,7 @@ begin
             A_precision_r <= A_precision;
             A_floor_r <= A_floor;
             A_abs_r <= A_abs;
+            A_int_r <= A_int;
             B_r <= B_in;
             C_r <= C_in;
             C2_r <= C2_in;
@@ -282,6 +286,7 @@ falu_i: falu
         input_fast_in => alu_input_fast,
         A_addr => A_addr_r,
         A_precision => A_precision_r,
+		A_int => A_int_r,
         A_floor => A_floor_r,
         A_abs => A_abs_r,
         B_in => B_r,
