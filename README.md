@@ -184,7 +184,8 @@ make clean all -f makefile.quant
 ./build/quant ZTA Q4 SmolLM2-135M-Instruct.gguf SMOLLM2.ZUF
 ```
 
-- Copy SMOLLM2.ZUF to a Micro-SSD card and plug the card to Micro-SSD card slot of the dev-kit.
+- SMOLLM2.ZUF will be transfered from PC to FPGA board over Ethernet. A TFTP server is required to run on a PC that is connecting to the ArtyBoard by Ethernet.
+PC Ethernet interface is expected to be configured with an ip address=10.10.10.10 
 
 # FPGA build procedure
 
@@ -221,8 +222,6 @@ Reference design example required the hardware components below...
 - [VGA module](https://digilent.com/shop/pmod-vga-video-graphics-array/)
 
 - [Camera module](https://www.amazon.ca/640X480-Interface-Exposure-Control-Display/dp/B07PX4N3YS/ref=sr_1_2_sspa?gclid=EAIaIQobChMIttra8bjo-QIVCMqzCh27tA5XEAAYASAAEgKJTPD_BwE&hvadid=596026577980&hvdev=c&hvlocphy=9000555&hvnetw=g&hvqmt=e&hvrand=6338354247560979516&hvtargid=kwd-296249713094&hydadcr=13589_13421122&keywords=ov7670+camera+module&qid=1661652319&sr=8-2-spons&psc=1&spLa=ZW5jcnlwdGVkUXVhbGlmaWVyPUEzVDhCRUlYWEJZUU8xJmVuY3J5cHRlZElkPUEwMDExNDE5M1ZRSEw3WDdEWk9VWiZlbmNyeXB0ZWRBZElkPUEwMTgwOTYwWTFXWUNPWE8xQzk2JndpZGdldE5hbWU9c3BfYXRmJmFjdGlvbj1jbGlja1JlZGlyZWN0JmRvTm90TG9nQ2xpY2s9dHJ1ZQ==)
-
-- [Wifi+MicroSD](https://www.adafruit.com/product/4285)
 
 Attach the VGA and Camera modules to Arty-A7 board according to picture below 
 
@@ -322,7 +321,7 @@ To use the paste mode, hit Ctrl+E then paste one of the [examples](micropython/e
 Hit any button to return back to Micropython prompt.
 
 ### Running demo #3
-After LLM model has been loaded from SSD card, you will be presented with a prompt on the serial port.
+You will be presented with a prompt on the serial port.
 Enter a question then hit enter.
 There will be a response from LLM model.
 Hit Ctrl-C to break the response.
