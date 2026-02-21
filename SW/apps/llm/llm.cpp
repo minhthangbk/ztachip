@@ -91,6 +91,7 @@ llama::llama() {
     m_pos2=0;
     m_samplingGreedy=true;
     m_samplingThreshold=0.0f;
+    m_minp = 0.0f;
     m_samplingScale=1.0f;
     m_stat.numTokens = 0;
     m_stat.totalTime = 0;
@@ -122,7 +123,8 @@ ZtaStatus llama::Open(const char* checkpoint_path) {
 
     printf("Opening model\r\n");
 
-    m_zuf.Open(checkpoint_path);
+    if(m_zuf.Open(checkpoint_path) != ZtaStatusOk)
+        return ZtaStatusFail;
 
     if(!m_zuf.ReadItemU32("llama.embedding_length", m_config.dim))
         return ZtaStatusFail;
@@ -414,7 +416,7 @@ void llama::Close() {
 // p is the accumulate probability threshold that we can choose the tokens. A large
 // p allows less likely tokens to be chosen.
 
-ZtaStatus llama::SetSamplingPolicy(float temperature,float p,int k) {
+ZtaStatus llama::SetSamplingPolicy(float temperature,float p,float min_p,int k) {
     if(temperature==0)
         return ZtaStatusFail;
     if(p < 0.0 || p > 1.0)
@@ -423,6 +425,7 @@ ZtaStatus llama::SetSamplingPolicy(float temperature,float p,int k) {
         return ZtaStatusFail;
     m_samplingGreedy = false;
     m_samplingThreshold = p;
+    m_minp = min_p;
     m_samplingScale = 1/temperature;
     m_samplingK = k;
     return ZtaStatusOk;
@@ -434,6 +437,7 @@ ZtaStatus llama::SetSamplingPolicy(float temperature,float p,int k) {
 ZtaStatus llama::SetSamplingPolicyGreedy() {
     m_samplingGreedy = true;
     m_samplingThreshold = 0;
+    m_minp = 0.0f;
     m_samplingScale = 0;
     m_samplingK = 1;
     return ZtaStatusOk;
@@ -576,8 +580,9 @@ float16_t* llama::forward(int token, int pos) {
 // Pick a tokens where the total probability upto the chosen tokens is <= random number 
 
 int llama::sampling(float16_t* _logits) {
-    int top[K_MAX];
-    float topp[K_MAX];
+    static int top[K_MAX];
+    static float topp[K_MAX];
+    static float16_t toppbf[K_MAX];
     static uint32_t seed = 123456789;
     float accum = 0;
     float prob;
@@ -592,25 +597,36 @@ int llama::sampling(float16_t* _logits) {
         return kernel_llm_find_max(_logits, m_config.vocab_size);
 
     kernel_llm_scale_exe(- 1, m_config.vocab_size, _logits, m_samplingScale);
-//        kernel_llm_done();
-//        FLUSH_DATA_CACHE();
-    kernel_llm_softmax_exe(-1, _logits, m_config.vocab_size);
-
-    kernel_llm_done();    
 
     // Find the top-k
 
-    kernel_llm_find_k_max(_logits,m_config.vocab_size,m_samplingK,top,topp);
+    kernel_llm_done();
+
+    kernel_llm_find_k_max(_logits,m_config.vocab_size,m_samplingK,top,toppbf);
+
+    kernel_llm_done();  
+    
+    kernel_llm_softmax_exe(-1, toppbf, m_samplingK);
+        
+    kernel_llm_done(); 
+
+    FLUSH_DATA_CACHE();
+
+    for(int i=0;i < m_samplingK;i++)
+        topp[i] = BF2F(toppbf[i]);
 
     sum = 0;
     for (ksz = 0;ksz < m_samplingK; ksz++) {
         sum += topp[ksz];
-        if (sum >= m_samplingThreshold)
+        if(topp[ksz] < topp[0]*m_minp)
+            break;
+        if (sum > m_samplingThreshold)
             break;
     }
-    ksz++;
     if (ksz > m_samplingK)
         ksz = m_samplingK;
+    if (ksz == 0)
+        ksz = 1;
 
     sum=0;
     for(int i=0;i < ksz;i++) {
@@ -630,7 +646,7 @@ int llama::sampling(float16_t* _logits) {
     }
     if(select >= ksz)
         select = ksz-1;
-  return top[select];
+    return top[select];
 }
 
 void llama::safe_printf(char *piece) {

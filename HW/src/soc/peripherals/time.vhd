@@ -50,7 +50,7 @@ match <= apb_penable when (apb_paddr(apb_addr_len_c-1 downto 0)=std_logic_vector
 
 match2 <= apb_penable when (apb_paddr(apb_addr_len_c-1 downto 0)=std_logic_vector(to_unsigned(apb_time2_get_c,apb_addr_len_c))) else '0';
 
-apb_pready <= '1' when (match='1' or match2='1') else 'Z';
+apb_pready <= '1' when (match='1' or match2='1') else '0';
 
 apb_prdata <= std_logic_vector(time_r) when (match='1') else (others=>'Z');
 

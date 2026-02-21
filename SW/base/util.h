@@ -66,6 +66,14 @@ inline float16_t F2BF(float x) {
     return ((uint16_t *)&x)[1];
 }
 
+inline int BFCMP(float16_t a,float16_t b) {
+    // Transform sign-magnitude bits to linear signed integers
+    // If sign bit is set, value = -(magnitude). Else, value = magnitude.
+    int16_t ia = (a & 0x8000)? -(int16_t)(a & 0x7FFF):(int16_t)a;
+    int16_t ib = (b & 0x8000)? -(int16_t)(b & 0x7FFF):(int16_t)b;
+    return (ia > ib) - (ia < ib);
+}
+
 // cast float to its hex presentation
 
 #define F2HEX(x)  (*((uint32_t *)(&(x))))

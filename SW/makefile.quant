@@ -14,7 +14,7 @@ CFLAGS= \
 OBJ = ./apps/llm/gguf/quant.o ./apps/llm/gguf/gguf.o ./apps/llm/gguf/zuf.o
 
 %.o: %.cpp
-	$(CC) $(CFLAGS) -c -o $@ $<
+	$(CC) $(CFLAGS) -DQUANTIZER -c -o $@ $<
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c -o $@ $<

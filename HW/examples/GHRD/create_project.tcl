@@ -49,6 +49,7 @@ read_vhdl ../../src/soc/peripherals/gpio.vhd
 read_vhdl ../../src/soc/peripherals/vga.vhd
 read_vhdl ../../src/soc/peripherals/time.vhd
 read_vhdl ../../src/soc/peripherals/uart.vhd
+read_vhdl ../../src/soc/peripherals/ethlite.vhd
 read_vhdl ../../src/top/axilite.vhd
 read_vhdl ../../src/top/cell.vhd
 read_vhdl ../../src/top/ddr_rx.vhd
@@ -92,6 +93,10 @@ read_verilog ../../platform/Xilinx/FP32_ADDSUB.v
 
 read_xdc main.xdc
 
+######################################################################################
+#### Create IP instance for clock synthesizer 
+######################################################################################
+
 create_ip -name clk_wiz -vendor xilinx.com -library ip -version 6.0 -module_name clk_wiz_0
 set_property -dict [list \
 			CONFIG.CLKOUT1_USED {true} \
@@ -106,9 +111,15 @@ set_property -dict [list \
 			CONFIG.CLKOUT5_REQUESTED_OUT_FREQ {125.000} \
 			CONFIG.CLKOUT6_USED {true} \
 			CONFIG.CLKOUT6_REQUESTED_OUT_FREQ {250.000} \
+			CONFIG.CLKOUT7_USED {true} \
+			CONFIG.CLKOUT7_REQUESTED_OUT_FREQ {25.000} \
 			CONFIG.RESET_TYPE {ACTIVE_LOW}] [get_ips clk_wiz_0]
 
 generate_target all [get_files ztachip.srcs/sources_1/ip/clk_wiz_0/clk_wiz_0.xci]
+
+######################################################################################
+#### Create IP instance for F32 adder
+######################################################################################
 
 create_ip -name floating_point -vendor xilinx.com -library ip -version 7.1 -module_name float_addsub
 set_property -dict [list \
@@ -120,6 +131,9 @@ set_property -dict [list \
 
 generate_target all [get_files ztachip.srcs/sources_1/ip/float_addsub/float_addsub.xci]
 
+######################################################################################
+#### Create IP instance for F32 multiplier
+######################################################################################
 
 create_ip -name floating_point -vendor xilinx.com -library ip -version 7.1 -module_name float_mul
 set_property -dict [list \
@@ -130,6 +144,31 @@ set_property -dict [list \
 			[get_ips float_mul]
 
 generate_target all [get_files ztachip.srcs/sources_1/ip/float_mul/float_mul.xci]
+
+
+######################################################################################
+#### Create IP instance for EthernetLite
+######################################################################################
+
+create_ip -name axi_ethernetlite \
+          -vendor xilinx.com \
+          -library ip \
+          -version 3.0 \
+          -module_name axi_ethernetlite_0
+
+set_property -dict [list \
+	CONFIG.AXI_ACLK_FREQ_MHZ {125} \
+    CONFIG.C_TX_PING_PONG {1} \
+    CONFIG.C_RX_PING_PONG {1} \
+    CONFIG.C_INCLUDE_MDIO {1} \
+    CONFIG.C_INCLUDE_INTERNAL_LOOPBACK {0} \
+] [get_ips axi_ethernetlite_0]
+
+generate_target all [get_files ztachip.srcs/sources_1/ip/axi_ethernetlite_0/axi_ethernetlite_0.xci]
+
+######################################################################################
+#### Create IP instance for DDR controller 
+######################################################################################
 
 create_ip -name mig_7series -vendor xilinx.com -library ip -version 4.2 -module_name mig_7series_0
 

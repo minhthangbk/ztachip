@@ -3,6 +3,7 @@
 #include "../base/ztalib.h"
 #include "../apps/gdi/gdi.h"
 #include "soc.h"
+#include "../base/net.h"
 
 extern "C"
 {
@@ -30,8 +31,10 @@ extern int chat();
 //-----------------------------------------
 
 int main() {
+
    ztaInit();
    GdiInit();
+   NetInit(0x0a0a0a63); // My local IP=10.10.10.99
 
 #ifdef ZTACHIP_UNIT_TEST
    // Run unit tests against test vectors

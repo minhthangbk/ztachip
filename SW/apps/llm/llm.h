@@ -56,7 +56,7 @@ public:
     ZtaStatus UserPrompt(char *userPrompt,std::string *output);
     void Clear();
     void Close();
-    ZtaStatus SetSamplingPolicy(float temperature,float p,int k);
+    ZtaStatus SetSamplingPolicy(float temperature,float p,float min_p,int k);
     ZtaStatus SetSamplingPolicyGreedy();
     void ClearStat();
     float GetStatTokPerSec();
@@ -124,6 +124,7 @@ private:
     } m_stat;
     bool m_samplingGreedy;
     float m_samplingThreshold;
+    float m_minp;
     float m_samplingScale;
     int m_samplingK;
 };

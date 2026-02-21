@@ -1481,7 +1481,7 @@ typedef struct  {
 // Find the top-k tokens of highest probability
 //--------------------------------------------------------------------------
 
-int kernel_llm_find_k_max(float16_t *x,uint32_t _N,int K, int *top,float *topp) {
+int kernel_llm_find_k_max(float16_t *x,uint32_t _N,int K, int *top,float16_t *topp) {
    uint32_t cnt,cnt2;
    int N;
    int toggle=0;
@@ -1520,7 +1520,7 @@ int kernel_llm_find_k_max(float16_t *x,uint32_t _N,int K, int *top,float *topp) 
       cnt = N-i;
       cnt = MIN(cnt,MAX_K_BATCH);
       cnt = MAX(cnt,MAX_K_GROUP_SZ);
-      last = ((i+cnt) >= N)?true:false; 
+      last = ((i+cnt) >= N)?true:false;  
 
       kernel_llm_done();
       
@@ -1539,17 +1539,17 @@ int kernel_llm_find_k_max(float16_t *x,uint32_t _N,int K, int *top,float *topp) 
       FLUSH_DATA_CACHE();
 
       for(int j=0;j < cnt;j+=MAX_K_GROUP_SZ) {
-         if( ws2->y[toggle][j/MAX_K_GROUP_SZ] <= max[K-1].s.f)
+         if( BFCMP(ws2->y[toggle][j/MAX_K_GROUP_SZ],max[K-1].s.f) <= 0)
             continue;
          for(int k=0;k < MAX_K_GROUP_SZ;k++) {
             v = ws2->x[toggle][j+k];
-            if (v > max[K-1].s.f) {
+            if (BFCMP(v,max[K-1].s.f) > 0) {
                max[K-1].s.f = v;
                max[K-1].s.idx = i+j+k;
                // Push the new entries down the max probability list in order
                // of probability value
                for(int kk=K-1;kk >= 1;kk--) {
-                  if(max[kk].s.f <= max[kk-1].s.f)
+                  if(BFCMP(max[kk].s.f,max[kk-1].s.f) <= 0)
                      break;
                   t = max[kk-1].dw;max[kk-1].dw=max[kk].dw;max[kk].dw=t;
                }
@@ -1561,7 +1561,7 @@ int kernel_llm_find_k_max(float16_t *x,uint32_t _N,int K, int *top,float *topp) 
 
    for(int i=0;i < K;i++) {
       top[i] = (int)max[i].s.idx;
-      topp[i] = BF2F(max[i].s.f);
+      topp[i] = max[i].s.f;
    }
    return 0;
 }

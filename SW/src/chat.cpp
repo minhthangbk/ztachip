@@ -77,26 +77,19 @@ int chat() {
     int goodCount=0;
     int i;
 
-#if 0
-#ifdef __WIN32__
-      ai.Open("c:\\Users\\vuong\\VM\\ztachip\\SW\\gguf\\LLAMA.ZUF");
-#else
-      ai.Open("LLAMA.ZUF");
-#endif
-#endif
-
-    printf("\r\n Loading model from SD card \r\n");
-    printf("\r\n Loading is slow since SPI driver for SD card is not hardware based yet.\r\n");
 #if 1
 #ifdef __WIN32__
-      ai.Open("c:\\Users\\vuong\\VM\\ztachip\\SW\\gguf\\xxx.ZUF");
+    if(ai.Open("c:\\Users\\vuong\\VM\\ztachip\\SW\\gguf\\xxx.ZUF") != ZtaStatusOk)
+        return -1;
 #else
-      ai.Open("SMOLLM2.ZUF");
+    if(ai.Open("SMOLLM2.ZUF") != ZtaStatusOk)
+        return -1;
 #endif
 #endif
 
-//      ai.SetSamplingPolicy(0.5,0.85,20); // temperature=0.8,threshold=0.9;top-k=20
-      ai.SetSamplingPolicyGreedy();
+//      ai.SetSamplingPolicy(0.8,0.950,40); // temperature=0.8,threshold=0.9;top-k=20
+      ai.SetSamplingPolicy(0.7,0.9,0.05,40);
+//      ai.SetSamplingPolicyGreedy();
 #ifdef __WIN32__
     ai.SystemPrompt((char*)"You are a helpful assistant.");
     for(i=0;;i++) {

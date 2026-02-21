@@ -38,6 +38,7 @@
 #include <vector>
 #include <string>
 #include "../../../base/util.h"
+#include "../../../base/net.h"
 #include "../../../base/types.h"
 #include "zuf.h"
 #include "gguf.h"
@@ -71,10 +72,13 @@ ZUF::~ZUF() {
 // Open and create a ZUF file
 
 ZtaStatus ZUF::Create(const char *fname) {
+    ZUF_HEADER h;
     m_fp = fopen(fname,"wb");
     if(!m_fp)
         return ZtaStatusFail;
     m_wpos = 0;
+    memset(&h,0,sizeof(h));
+    write(&h,sizeof(ZUF_HEADER));
     return ZtaStatusOk;
 }
 
@@ -82,8 +86,14 @@ ZtaStatus ZUF::Create(const char *fname) {
 
 ZtaStatus ZUF::CreateComplete() {
     if (m_fp) {
+        ZUF_HEADER h;
         uint8_t type=ZUF_TYPE_EOF;
-        fwrite(&type, 1, sizeof(type), m_fp);
+        write(&type, 1);
+        memset(&h,0,sizeof(h));
+        memcpy(h.magicNumber,"ZTACHIP!",sizeof(h.magicNumber));
+        H2N((uint32_t)m_wpos,h.len); // Handle small model only
+        writeReset();
+        write(&h,sizeof(ZUF_HEADER));       
         fclose(m_fp);
         m_fp = 0;
     }
@@ -93,13 +103,18 @@ ZtaStatus ZUF::CreateComplete() {
 // Open an existing ZUF file
 
 ZtaStatus ZUF::Open(const char* fname) {
+#ifndef QUANTIZER
     int fd;
     size_t sz,sz2;
     struct stat fileStat;
     uint8_t* p;
+    ZUF_HEADER h;
+    uint32_t size;
 
+    printf("Downloading model file %s from TFTP server@10.10.10.10 \r\n",fname);
     if (m_buf)
         free(m_buf);
+#if 0
     m_buf = 0;
     m_top = 0;
     fd = _open(fname, O_RDONLY);
@@ -126,6 +141,25 @@ ZtaStatus ZUF::Open(const char* fname) {
     }
 #endif
     _close(fd);
+#endif
+
+    sz=NetTftpDownload(0x0a0a0a0a,(char *)fname,(uint8_t *)&h,sizeof(h),false);
+    if(sz!=sizeof(h)) {
+        printf("Fail to download model file. Check your Ethernet connection \r\n");
+        return ZtaStatusFail;
+    }
+    N2H(h.len,size);
+
+    m_buf = (uint8_t *)malloc(size+256);
+    m_top = (uint8_t *)((((size_t)m_buf+BYTE_ALIGNMENT-1)/BYTE_ALIGNMENT)*BYTE_ALIGNMENT);
+    sz=NetTftpDownload(0x0a0a0a0a,(char *)fname,m_top,size,true);
+    if(sz != size) {
+        printf("Fail to download model file. Check your Ethernet connection \r\n");
+        return ZtaStatusFail;
+    }
+    m_top += sizeof(ZUF_HEADER);
+    printf("Download completed successfully len=%d \r\n",(int)size);
+#endif
     return ZtaStatusOk;
 }
 

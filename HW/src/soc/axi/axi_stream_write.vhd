@@ -154,7 +154,7 @@ apb_match <= '1' when (apb_wvdma_enable_match='1' or apb_wvdma_buf0_match='1' or
                        else
                        '0'; 
                   
-apb_pready <= '1' when (apb_match='1' and apb_penable='1') else 'Z';
+apb_pready <= '1' when (apb_match='1' and apb_penable='1') else '0';
 
 apb_pslverror <= '0' when (apb_match='1' and apb_penable='1') else 'Z';                      
      

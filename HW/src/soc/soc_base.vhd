@@ -74,13 +74,13 @@ entity soc_base is
 
    -- APB bus signals
 
-   APB_PADDR       :INOUT STD_LOGIC_VECTOR(19 downto 0);
-   APB_PENABLE     :INOUT STD_LOGIC;
-   APB_PREADY      :INOUT STD_LOGIC;
-   APB_PWRITE      :INOUT STD_LOGIC;
-   APB_PWDATA      :INOUT STD_LOGIC_VECTOR(31 downto 0);
-   APB_PRDATA      :INOUT STD_LOGIC_VECTOR(31 downto 0);
-   APB_PSLVERROR   :INOUT STD_LOGIC;
+   APB_PADDR_OUT   :OUT STD_LOGIC_VECTOR(19 downto 0);
+   APB_PENABLE_OUT :OUT STD_LOGIC_VECTOR(apb_max_devices_c-1 DOWNTO 0);
+   APB_PREADY_IN   :IN STD_LOGIC;
+   APB_PWRITE_OUT  :OUT STD_LOGIC;
+   APB_PWDATA_OUT  :OUT STD_LOGIC_VECTOR(31 downto 0);
+   APB_PRDATA_IN   :IN STD_LOGIC_VECTOR(31 downto 0);
+   APB_PSLVERROR_IN:IN STD_LOGIC;
 
    -- LED/pushbutton
 
@@ -110,16 +110,7 @@ entity soc_base is
    SIGNAL CAMERA_SDR   :OUT STD_LOGIC;
    SIGNAL CAMERA_RS    :IN STD_LOGIC;
    SIGNAL CAMERA_MCLK  :OUT STD_LOGIC;
-   SIGNAL CAMERA_PWDN  :OUT STD_LOGIC;
-
-   -- SPI signals
-   
-   SIGNAL spi_ss       :OUT STD_LOGIC;
-   SIGNAL spi_sclk     :OUT STD_LOGIC;
-   SIGNAL spi_mosi     :OUT STD_LOGIC;
-   SIGNAL spi_cs_sd    :OUT STD_LOGIC;
-   SIGNAL spi_cs_esp32 :OUT STD_LOGIC;
-   SIGNAL spi_miso     :IN STD_LOGIC
+   SIGNAL CAMERA_PWDN  :OUT STD_LOGIC
    );
 end soc_base;
    
@@ -535,6 +526,20 @@ architecture rtl of soc_base is
    SIGNAL ogpio:STD_LOGIC_VECTOR(15 downto 0);
    SIGNAL igpio:STD_LOGIC_VECTOR(15 downto 0);
 
+   SIGNAL apb_paddr:STD_LOGIC_VECTOR(19 downto 0);
+   SIGNAL apb_penable:STD_LOGIC_VECTOR(apb_max_devices_c-1 DOWNTO 0);
+   SIGNAL apb_pready:STD_LOGIC;
+   SIGNAL apb_pwrite:STD_LOGIC;
+   SIGNAL apb_pwdata:STD_LOGIC_VECTOR(31 downto 0);
+   SIGNAL apb_prdata:STD_LOGIC_VECTOR(31 downto 0);
+   SIGNAL apb_prdata2:STD_LOGIC_VECTOR(31 downto 0);
+
+   SIGNAL wvdma_pready:STD_LOGIC;
+   SIGNAL rvdma_pready:STD_LOGIC;
+   SIGNAL time_pready:STD_LOGIC;
+   SIGNAL gpio_pready:STD_LOGIC;
+   SIGNAL uart_pready:STD_LOGIC;
+
    constant TCM_DEPTH : integer:=14; -- TCM size=2**TCM_DEPTH bytes
 
 begin
@@ -543,27 +548,22 @@ begin
    
    led <= ogpio(3 downto 0);
 
-   spi_ss <= ogpio(4);
-
-   spi_sclk <= ogpio(5);
-
-   spi_mosi <= ogpio(6);
-
-   spi_cs_sd <= ogpio(7);
-
-   spi_cs_esp32 <= ogpio(8);
-
    igpio(3 downto 0) <= pushbutton;
 
-   igpio(4) <= spi_miso;
-
-   igpio(7 downto 5) <= (others=>'0');
+   igpio(7 downto 4) <= (others=>'0');
 
    ZTA_CONTROL_rlast <= '1';
 
    ZTA_CONTROL_rid <= (others=>'0');
    
    ZTA_CONTROL_bid <= (others=>'0');
+
+   APB_PADDR_OUT <= apb_paddr;
+   APB_PENABLE_OUT <= apb_penable;
+   apb_pready <= APB_PREADY_IN or wvdma_pready or rvdma_pready or time_pready or gpio_pready or uart_pready;
+   APB_PWRITE_OUT <= apb_pwrite;
+   APB_PWDATA_OUT <= apb_pwdata;
+   apb_prdata <= APB_PRDATA_IN when APB_PREADY_IN='1' else apb_prdata2;
 
    -- -----------------------------
    -- CPU. RISCV based on VexRiscv
@@ -1213,13 +1213,13 @@ axi_apb_bridge_inst : axi_apb_bridge
       axislave_awsize_in=>apb_awsize,
       axislave_bready_in=>apb_bready,
          
-      apb_paddr_out=>APB_PADDR,
-      apb_penable_out=>APB_PENABLE,
-      apb_pready_in=>APB_PREADY,
-      apb_pwrite_out=>APB_PWRITE,
-      apb_pwdata_out=>APB_PWDATA,
-      apb_prdata_in=>APB_PRDATA,
-      apb_pslverror_in=>APB_PSLVERROR
+      apb_paddr_out=>apb_paddr,
+      apb_penable_out=>apb_penable,
+      apb_pready_in=>apb_pready,
+      apb_pwrite_out=>apb_pwrite,
+      apb_pwdata_out=>apb_pwdata,
+      apb_prdata_in=>apb_prdata,
+      apb_pslverror_in=>'0'
    );
 
 axi_stream_write_inst : axi_stream_write
@@ -1260,13 +1260,13 @@ axi_stream_write_inst : axi_stream_write
       s_wvalid_in=>camera_tvalid,
       s_wlast_in=>camera_tlast,
 
-      apb_paddr=>APB_PADDR,
-      apb_penable=>APB_PENABLE,
-      apb_pready=>APB_PREADY,
-      apb_pwrite=>APB_PWRITE,
-      apb_pwdata=>APB_PWDATA,
-      apb_prdata=>APB_PRDATA,
-      apb_pslverror=>APB_PSLVERROR,
+      apb_paddr=>apb_paddr,
+      apb_penable=>apb_penable(apb_wvdma_id_c),
+      apb_pready=>wvdma_pready,
+      apb_pwrite=>apb_pwrite,
+      apb_pwdata=>apb_pwdata,
+      apb_prdata=>apb_prdata2,
+      apb_pslverror=>open,
 
       ready_out=>open
    );
@@ -1306,13 +1306,13 @@ axi_stream_read_inst : axi_stream_read
       s_rvalid_out=>VIDEO_tvalid,
       s_rlast_out=>VIDEO_tlast,
 
-      apb_paddr=>APB_PADDR,
-      apb_penable=>APB_PENABLE,
-      apb_pready=>APB_PREADY,
-      apb_pwrite=>APB_PWRITE,
-      apb_pwdata=>APB_PWDATA,
-      apb_prdata=>APB_PRDATA,
-      apb_pslverror=>APB_PSLVERROR
+      apb_paddr=>apb_paddr,
+      apb_penable=>apb_penable(apb_rvdma_id_c),
+      apb_pready=>rvdma_pready,
+      apb_pwrite=>apb_pwrite,
+      apb_pwdata=>apb_pwdata,
+      apb_prdata=>apb_prdata2,
+      apb_pslverror=>open
    );
 
    -------------------------
@@ -1512,13 +1512,13 @@ TIME_inst : TIMER
    port map(
       clock_in=>clk_main,
       reset_in=>'1',
-      apb_paddr=>APB_PADDR,
-      apb_penable=>APB_PENABLE,
-      apb_pready=>APB_PREADY,
-      apb_pwrite=>APB_PWRITE,
-      apb_pwdata=>APB_PWDATA,
-      apb_prdata=>APB_PRDATA,
-      apb_pslverror=>APB_PSLVERROR
+      apb_paddr=>apb_paddr,
+      apb_penable=>apb_penable(apb_time_id_c),
+      apb_pready=>time_pready,
+      apb_pwrite=>apb_pwrite,
+      apb_pwdata=>apb_pwdata,
+      apb_prdata=>apb_prdata2,
+      apb_pslverror=>open
    );
 
                  
@@ -1526,13 +1526,13 @@ gpio_inst:gpio
    port map(
       clock_in=>clk_main,
       reset_in=>'1',
-      apb_paddr=>APB_PADDR,
-      apb_penable=>APB_PENABLE,
-      apb_pready=>APB_PREADY,
-      apb_pwrite=>APB_PWRITE,
-      apb_pwdata=>APB_PWDATA,
-      apb_prdata=>APB_PRDATA,
-      apb_pslverror=>APB_PSLVERROR,
+      apb_paddr=>apb_paddr,
+      apb_penable=>apb_penable(apb_gpio_id_c),
+      apb_pready=>gpio_pready,
+      apb_pwrite=>apb_pwrite,
+      apb_pwdata=>apb_pwdata,
+      apb_prdata=>apb_prdata2,
+      apb_pslverror=>open,
       led_out=>ogpio,
       button_in=>igpio
    );
@@ -1546,13 +1546,13 @@ UART_INST:UART
       reset_in=>'1',
       uart_rx_in=>UART_RXD,
       uart_tx_out=>UART_TXD,
-      apb_paddr=>APB_PADDR,
-      apb_penable=>APB_PENABLE,
-      apb_pready=>APB_PREADY,
-      apb_pwrite=>APB_PWRITE,
-      apb_pwdata=>APB_PWDATA,
-      apb_prdata=>APB_PRDATA,
-      apb_pslverror=>APB_PSLVERROR
+      apb_paddr=>apb_paddr,
+      apb_penable=>apb_penable(apb_uart_id_c),
+      apb_pready=>uart_pready,
+      apb_pwrite=>apb_pwrite,
+      apb_pwdata=>apb_pwdata,
+      apb_prdata=>apb_prdata2,
+      apb_pslverror=>open
    );
 
 -----------

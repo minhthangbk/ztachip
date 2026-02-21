@@ -135,13 +135,13 @@ soc_base_inst: soc_base
       SDRAM_wstrb=>SDRAM_wstrb,
       SDRAM_wvalid=>SDRAM_wvalid,
 
-      APB_PADDR=>open,
-      APB_PENABLE=>open,
-      APB_PREADY=>open,
-      APB_PWRITE=>open,
-      APB_PWDATA=>open,
-      APB_PRDATA=>open,
-      APB_PSLVERROR=>open,
+      APB_PADDR_OUT=>open,
+      APB_PENABLE_OUT=>open,
+      APB_PREADY_IN=>'0',
+      APB_PWRITE_OUT=>open,
+      APB_PWDATA_OUT=>open,
+      APB_PRDATA_IN=>(others=>'0'),
+      APB_PSLVERROR_IN=>'0',
 
       led=>led_out,
       pushbutton=>(others=>'0'),
@@ -163,14 +163,7 @@ soc_base_inst: soc_base
       CAMERA_SDR=>open,
       CAMERA_RS=>'0',
       CAMERA_MCLK=>open,
-      CAMERA_PWDN=>open,
-
-      spi_ss=>open,
-      spi_sclk=>open,
-      spi_mosi=>open,
-      spi_cs_sd=>open,
-      spi_cs_esp32=>open,
-      spi_miso=>'0'
+      CAMERA_PWDN=>open
    );
 
 mem128_inst:mem128

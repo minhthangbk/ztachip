@@ -59,7 +59,7 @@ apb_pb_match <= '1' when (apb_paddr(apb_addr_len_c-1 downto 0)=std_logic_vector(
                           
 apb_match <= apb_led_match or apb_pb_match;
 
-apb_pready <= '1' when (apb_match='1' and apb_penable='1') else 'Z';
+apb_pready <= '1' when (apb_match='1' and apb_penable='1') else '0';
 
 apb_prdata(apb_prdata'length-1 downto button_rr'length) <= (others=>'0') 
                                                            when (apb_pb_match='1' and apb_penable='1' and apb_pwrite='0') 

@@ -95,12 +95,20 @@ module main(
    output         CAMERA_MCLK,
    output         CAMERA_PWDN ,
 
-   output         spi_ss,
-   output         spi_sclk,
-   output         spi_mosi,
-   output         spi_cs_sd,
-   output         spi_cs_esp32,
-   input          spi_miso 
+   input          eth_col,
+   input          eth_crs,
+   output         eth_ref_clk,
+   input          eth_rx_clk, 
+   input          eth_rxdv,
+   input          eth_rxerr,
+   input          eth_tx_clk,
+   input [3:0]    eth_rx_data,
+   output         eth_tx_en,
+   output [3:0]   eth_tx_data,       
+   output         eth_rst_n,
+
+   output wire    eth_mdc,
+   inout  wire    eth_mdio
    );
    
    wire               SDRAM_clk;
@@ -126,10 +134,9 @@ module main(
    wire               SDRAM_wlast;
    wire               SDRAM_wready;
    wire               SDRAM_wvalid;
-
-   wire [128-1:0] SDRAM_rdata;
-   wire [128-1:0] SDRAM_wdata;
-   wire [128/8-1:0] SDRAM_wstrb;
+   wire [128-1:0]     SDRAM_rdata;
+   wire [128-1:0]     SDRAM_wdata;
+   wire [128/8-1:0]   SDRAM_wstrb;
       
    wire [31:0]        VIDEO_tdata;
    wire               VIDEO_tlast;
@@ -143,12 +150,60 @@ module main(
    wire               camera_tvalid;
 
    wire [19:0]        APB_PADDR;
-   wire               APB_PENABLE;
+   wire [15:0]        APB_PENABLE;
    wire               APB_PREADY;
    wire               APB_PWRITE;
    wire [31:0]        APB_PWDATA;
    wire [31:0]        APB_PRDATA;
    wire               APB_PSLVERROR;
+
+   wire               mdio_i;
+   wire               mdio_o;
+   wire               mdio_t;
+
+   wire               locked;
+
+   IOBUF mdio_iobuf (
+      .I (mdio_o),   // data from IP
+      .O (mdio_i),   // data to IP
+      .T (mdio_t),   // 1 = High-Z, 0 = drive
+      .IO(eth_mdio)      // physical pin
+   );
+
+   // Output buffering
+   BUFG u_mainclk (
+      .O(eth_ref_clk),
+      .I(clk_eth_25)
+   );
+   
+   ethlite ethlite_i (
+      .clock_in(clk_main),
+      .reset_in(locked),
+
+      .apb_paddr(APB_PADDR),
+      .apb_penable(APB_PENABLE[6]),
+      .apb_pready(APB_PREADY),
+      .apb_pwrite(APB_PWRITE),
+      .apb_pwdata(APB_PWDATA),
+      .apb_prdata(APB_PRDATA),
+      .apb_pslverror(APB_PSLVERROR),
+
+      .phy_tx_clk(eth_tx_clk),
+      .phy_rx_clk(eth_rx_clk),
+      .phy_crs(eth_crs),
+      .phy_dv(eth_rxdv),
+      .phy_rx_data(eth_rx_data),
+      .phy_col(eth_col),
+      .phy_rx_er(eth_rxerr),
+      .phy_rst_n(eth_rst_n),
+      .phy_tx_en(eth_tx_en),
+      .phy_tx_data(eth_tx_data),
+
+      .phy_mdio_i(mdio_i),
+      .phy_mdio_o(mdio_o),
+      .phy_mdio_t(mdio_t),
+      .phy_mdc(eth_mdc)
+    );
 
    soc_base soc_base_inst (
       .clk_main(clk_main),
@@ -185,13 +240,13 @@ module main(
       .SDRAM_wstrb(SDRAM_wstrb),
       .SDRAM_wvalid(SDRAM_wvalid),
 
-      .APB_PADDR(APB_PADDR),
-      .APB_PENABLE(APB_PENABLE),
-      .APB_PREADY(APB_PREADY),
-      .APB_PWRITE(APB_PWRITE),
-      .APB_PWDATA(APB_PWDATA),
-      .APB_PRDATA(APB_PRDATA),
-      .APB_PSLVERROR(APB_PSLVERROR),
+      .APB_PADDR_OUT(APB_PADDR),
+      .APB_PENABLE_OUT(APB_PENABLE),
+      .APB_PREADY_IN(APB_PREADY),
+      .APB_PWRITE_OUT(APB_PWRITE),
+      .APB_PWDATA_OUT(APB_PWDATA),
+      .APB_PRDATA_IN(APB_PRDATA),
+      .APB_PSLVERROR_IN(APB_PSLVERROR),
 
       .led(led),
       .pushbutton(pushbutton),
@@ -213,14 +268,7 @@ module main(
       .CAMERA_SDR(CAMERA_SDR),
       .CAMERA_RS(CAMERA_RS),
       .CAMERA_MCLK(CAMERA_MCLK),
-      .CAMERA_PWDN(CAMERA_PWDN),
-   
-      .spi_ss(spi_ss),
-      .spi_sclk(spi_sclk),
-      .spi_mosi(spi_mosi),
-      .spi_cs_sd(spi_cs_sd),
-      .spi_cs_esp32(spi_cs_esp32),
-      .spi_miso(spi_miso)
+      .CAMERA_PWDN(CAMERA_PWDN)
    );
 
    //---------------------------
@@ -311,8 +359,9 @@ module main(
       .clk_out4(clk_camera),
       .clk_out5(clk_main),
       .clk_out6(clk_x2_main),
+      .clk_out7(clk_eth_25),
       .resetn(sys_resetn),
-      .locked(),
+      .locked(locked),
       .clk_in1(sys_clock));
 
 endmodule

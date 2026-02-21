@@ -1172,60 +1172,107 @@ constant register2_dp_burst_max_len_c   :integer:=34;   -- burst max length
 --- APB register map
 ---------
 
-constant apb_addr_len_c:integer:=8;
+constant apb_max_devices_c:integer:=16;
 
-constant apb_led_c:integer:=0;
+constant apb_base_addr_len_c:integer:=16;
 
-constant apb_pb_c:integer:=8;
+constant apb_addr_len_c:integer:=20;
 
-constant apb_wvdma_enable_c:integer:=12; 
+constant apb_base_mask_c:std_logic_vector:="11110000000000000000";
 
-constant apb_wvdma_get_curr_c:integer:=16;  
+-- GPIO Peripherals
 
-constant apb_wvdma_buf0_c:integer:=20;
+constant apb_gpio_id_c:integer:=0;
 
-constant apb_wvdma_buf1_c:integer:=24;
+constant apb_led_base_c:integer:=(apb_gpio_id_c * 2**16);
 
-constant apb_wvdma_buf2_c:integer:=28;
+constant apb_led_c:integer:=apb_led_base_c+0;
 
-constant apb_wvdma_buf3_c:integer:=32;
+constant apb_pb_c:integer:=apb_led_base_c+4;
 
-constant apb_rvdma_enable_c:integer:=36; 
+-- WRITE VDMA/CAMERA peripherals
 
-constant apb_rvdma_get_curr_c:integer:=40;  
+constant apb_wvdma_id_c:integer:=1;
 
-constant apb_rvdma_buf0_c:integer:=44;
+constant apb_wvdma_base_c:integer:=(apb_wvdma_id_c * 2**16);
 
-constant apb_rvdma_buf1_c:integer:=48;
+constant apb_wvdma_enable_c:integer:=apb_wvdma_base_c+0; 
 
-constant apb_rvdma_buf2_c:integer:=52;
+constant apb_wvdma_get_curr_c:integer:=apb_wvdma_base_c+4;  
 
-constant apb_rvdma_buf3_c:integer:=56;
+constant apb_wvdma_buf0_c:integer:=apb_wvdma_base_c+8;
 
-constant apb_uart_read_c:integer:=60;
+constant apb_wvdma_buf1_c:integer:=apb_wvdma_base_c+12;
 
-constant apb_uart_write_c:integer:=64;
+constant apb_wvdma_buf2_c:integer:=apb_wvdma_base_c+16;
 
-constant apb_uart_read_avail_c:integer:=68;
+constant apb_wvdma_buf3_c:integer:=apb_wvdma_base_c+20;
 
-constant apb_uart_write_avail_c:integer:=72;
+-- READ VDMA/VIDEO peripherals
 
-constant apb_time_get_c:integer:=76;
+constant apb_rvdma_id_c:integer:=2;
 
-constant apb_time2_get_c:integer:=80;
+constant apb_rvdma_base_c:integer:=(apb_rvdma_id_c * 2**16);
 
+constant apb_rvdma_enable_c:integer:=apb_rvdma_base_c+0; 
 
-constant apb_spi_config:integer:=84;
+constant apb_rvdma_get_curr_c:integer:=apb_rvdma_base_c+4;  
 
-constant apb_spi_status:integer:=88;
+constant apb_rvdma_buf0_c:integer:=apb_rvdma_base_c+8;
 
-constant apb_spi_read_req:integer:=92;
+constant apb_rvdma_buf1_c:integer:=apb_rvdma_base_c+12;
 
-constant apb_spi_read:integer:=96;
+constant apb_rvdma_buf2_c:integer:=apb_rvdma_base_c+16;
 
-constant apb_spi_write_req:integer:=100;
+constant apb_rvdma_buf3_c:integer:=apb_rvdma_base_c+20;
 
-constant apb_spi_write:integer:=104;
+-- UART peripheral
+
+constant apb_uart_id_c:integer:=3;
+
+constant apb_uart_base_c:integer:=(apb_uart_id_c * 2**16);
+
+constant apb_uart_read_c:integer:=apb_uart_base_c+0;
+
+constant apb_uart_write_c:integer:=apb_uart_base_c+4;
+
+constant apb_uart_read_avail_c:integer:=apb_uart_base_c+8;
+
+constant apb_uart_write_avail_c:integer:=apb_uart_base_c+12;
+
+-- TIMER peripheral
+
+constant apb_time_id_c:integer:=4;
+
+constant apb_time_base_c:integer:=(apb_time_id_c * 2**16);
+
+constant apb_time_get_c:integer:=apb_time_base_c+0;
+
+constant apb_time2_get_c:integer:=apb_time_base_c+4;
+
+-- SPI peripheral
+
+constant apb_spi_id_c:integer:=5;
+
+constant apb_spi_base:integer:=(apb_spi_id_c * 2**16);
+
+constant apb_spi_config:integer:=apb_spi_base+0;
+
+constant apb_spi_status:integer:=apb_spi_base+4;
+
+constant apb_spi_read_req:integer:=apb_spi_base+8;
+
+constant apb_spi_read:integer:=apb_spi_base+12;
+
+constant apb_spi_write_req:integer:=apb_spi_base+16;
+
+constant apb_spi_write:integer:=apb_spi_base+20;
+
+-- Ethernet peripheral
+
+constant apb_ethlite_id_c:integer:=6;
+
+constant apb_ethlite_base:integer:=(apb_ethlite_id_c * 2**16);
 
 
 ---------------------------------------------------------------------------
@@ -2590,7 +2637,7 @@ component axi_apb_bridge is
         axislave_bready_in         : IN axi_bready_t;
         
         apb_paddr_out              : OUT STD_LOGIC_VECTOR(19 downto 0);
-        apb_penable_out            : OUT STD_LOGIC;
+        apb_penable_out            : OUT STD_LOGIC_VECTOR(apb_max_devices_c-1 DOWNTO 0);
         apb_pready_in              : IN STD_LOGIC;
         apb_pwrite_out             : OUT STD_LOGIC;
         apb_pwdata_out             : OUT STD_LOGIC_VECTOR(31 downto 0);
@@ -4975,13 +5022,13 @@ component soc_base is
 
         -- APB bus signals
 
-        APB_PADDR       :INOUT STD_LOGIC_VECTOR(19 downto 0);
-        APB_PENABLE     :INOUT STD_LOGIC;
-        APB_PREADY      :INOUT STD_LOGIC;
-        APB_PWRITE      :INOUT STD_LOGIC;
-        APB_PWDATA      :INOUT STD_LOGIC_VECTOR(31 downto 0);
-        APB_PRDATA      :INOUT STD_LOGIC_VECTOR(31 downto 0);
-        APB_PSLVERROR   :INOUT STD_LOGIC;
+        APB_PADDR_OUT   :OUT STD_LOGIC_VECTOR(19 downto 0);
+        APB_PENABLE_OUT :OUT STD_LOGIC_VECTOR(apb_max_devices_c-1 DOWNTO 0);
+        APB_PREADY_IN   :IN STD_LOGIC;
+        APB_PWRITE_OUT  :OUT STD_LOGIC;
+        APB_PWDATA_OUT  :OUT STD_LOGIC_VECTOR(31 downto 0);
+        APB_PRDATA_IN   :IN STD_LOGIC_VECTOR(31 downto 0);
+        APB_PSLVERROR_IN:IN STD_LOGIC;
 
         -- LED/pushbutton
 
@@ -5011,16 +5058,7 @@ component soc_base is
         SIGNAL CAMERA_SDR   :OUT STD_LOGIC;
         SIGNAL CAMERA_RS    :IN STD_LOGIC;
         SIGNAL CAMERA_MCLK  :OUT STD_LOGIC;
-        SIGNAL CAMERA_PWDN  :OUT STD_LOGIC;
-
-        -- SPI signals
-
-        SIGNAL spi_ss       :OUT STD_LOGIC;
-        SIGNAL spi_sclk     :OUT STD_LOGIC;
-        SIGNAL spi_mosi     :OUT STD_LOGIC;
-        SIGNAL spi_cs_sd    :OUT STD_LOGIC;
-        SIGNAL spi_cs_esp32 :OUT STD_LOGIC;
-        SIGNAL spi_miso     :IN STD_LOGIC
+        SIGNAL CAMERA_PWDN  :OUT STD_LOGIC
     );
 end component;
 
@@ -5485,6 +5523,38 @@ component gpio is
     );
 end component;
 
+COMPONENT ethlite is
+   PORT (
+      signal clock_in              : IN STD_LOGIC;
+      signal reset_in              : IN STD_LOGIC;
+
+      signal apb_paddr             : IN STD_LOGIC_VECTOR(19 downto 0);
+      signal apb_penable           : IN STD_LOGIC;
+      signal apb_pready            : OUT STD_LOGIC;
+      signal apb_pwrite            : IN STD_LOGIC;
+      signal apb_pwdata            : IN STD_LOGIC_VECTOR(31 downto 0);
+      signal apb_prdata            : OUT STD_LOGIC_VECTOR(31 downto 0);
+      signal apb_pslverror         : OUT STD_LOGIC;
+
+      signal phy_tx_clk            : IN STD_LOGIC;
+      signal phy_rx_clk            : IN STD_LOGIC;
+      signal phy_crs               : IN STD_LOGIC;
+      signal phy_dv                : IN STD_LOGIC;
+      signal phy_rx_data           : IN STD_LOGIC_VECTOR(3 DOWNTO 0);
+      signal phy_col               : IN STD_LOGIC;
+      signal phy_rx_er             : IN STD_LOGIC;
+      signal phy_rst_n             : OUT STD_LOGIC;
+      signal phy_tx_en             : OUT STD_LOGIC;
+      signal phy_tx_data           : OUT STD_LOGIC_VECTOR(3 DOWNTO 0);
+
+      signal phy_mdio_i            : IN STD_LOGIC;
+      signal phy_mdio_o            : OUT STD_LOGIC;
+      signal phy_mdio_t            : OUT STD_LOGIC;
+      signal phy_mdc               : OUT STD_LOGIC
+    );
+end COMPONENT;
+
+-------------------------------------
 COMPONENT fp12 IS
     GENERIC (
         INT_WIDTH     : integer -- Width of integer to be converted tp float 12bit

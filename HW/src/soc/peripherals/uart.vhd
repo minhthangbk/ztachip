@@ -105,7 +105,7 @@ match_write_avail <= apb_penable when (apb_paddr(apb_addr_len_c-1 downto 0)=std_
 
 match <= match_read or match_read_avail or match_write or match_write_avail;
 
-apb_pready <= '1' when (match='1') else 'Z';
+apb_pready <= '1' when (match='1') else '0';
 
 apb_pslverror <= '1' when (match='1') else 'Z';
 

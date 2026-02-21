@@ -35,34 +35,89 @@
 
 #define APB ((volatile unsigned int *)0xC0000000)
 
-// APB register map
+//--------------- APB register map -------------------------
 
-#define APB_LED               0
+// GPIO memory map
 
-#define APB_PB                2
+#define APB_LED_BASE          (0/4)
 
-#define APB_VIDEO_BUFFER      11
+#define APB_LED               (APB_LED_BASE+0)
 
-#define APB_VIDEO_ENABLE      9
+#define APB_PB                (APB_LED_BASE+1)
 
-#define APB_CAMERA_BUFFER     5
+// Camera memory map (axi_rstream)
 
-#define APB_CAMERA_ENABLE     3
+#define APB_CAMERA_BASE       (0x10000/4)
 
-#define APB_CAMERA_CURR_FRAME 4
+#define APB_CAMERA_ENABLE     (APB_CAMERA_BASE+0)
 
-#define APB_UART_READ         15 
+#define APB_CAMERA_CURR_FRAME (APB_CAMERA_BASE+1)
 
-#define APB_UART_WRITE        16 
+#define APB_CAMERA_BUFFER     (APB_CAMERA_BASE+2)
 
-#define APB_UART_READ_AVAIL   17 
+// Video memory map (axi_wstream)
 
-#define APB_UART_WRITE_AVAIL  18 
+#define APB_VIDEO_BASE        (0x20000/4)
 
-#define APB_TIME_GET          19 
+#define APB_VIDEO_ENABLE      (APB_VIDEO_BASE+0)
 
-#define APB_TIME2_GET         20
+#define APB_VIDEO_CURR        (APB_VIDEO_BASE+1)
 
+#define APB_VIDEO_BUFFER      (APB_VIDEO_BASE+2)
+
+// UART memory map
+
+#define APB_UART_BASE         (0x30000/4)
+
+#define APB_UART_READ         (APB_UART_BASE+0) 
+
+#define APB_UART_WRITE        (APB_UART_BASE+1) 
+
+#define APB_UART_READ_AVAIL   (APB_UART_BASE+2) 
+
+#define APB_UART_WRITE_AVAIL  (APB_UART_BASE+3) 
+
+// Timer memory map
+
+#define APB_TIME_BASE         (0x40000/4)
+
+#define APB_TIME_GET          (APB_TIME_BASE+0) 
+
+#define APB_TIME2_GET         (APB_TIME_BASE+1)
+
+// Ethernet memory map
+
+#define APB_ETH_BASE          (0x60000/4)
+
+#define APB_ETH_TXPINGBUF     (APB_ETH_BASE+0/4)
+
+#define APB_ETH_TXPONGBUF     (APB_ETH_BASE+0x800/4)
+
+#define APB_ETH_RXPINGBUF     (APB_ETH_BASE+0x1000/4)
+
+#define APB_ETH_RXPONGBUF     (APB_ETH_BASE+0x1800/4)
+
+#define APB_ETH_GIE           (APB_ETH_BASE+0x7F8/4)
+
+#define APB_ETH_MDIOADDR      (APB_ETH_BASE+0x7E4/4)
+
+#define APB_ETH_MDIOWR        (APB_ETH_BASE+0x7E8/4)
+
+#define APB_ETH_MDIORD        (APB_ETH_BASE+0x7EC/4)
+
+#define APB_ETH_MDIOCTRL      (APB_ETH_BASE+0x7F0/4)
+
+#define APB_ETH_TXPINGLEN     (APB_ETH_BASE+0x7F4/4)
+
+#define APB_ETH_TXPINGCTRL    (APB_ETH_BASE+0x7FC/4)
+
+#define APB_ETH_TXPONGLEN     (APB_ETH_BASE+0xFF4/4)
+
+#define APB_ETH_TXPONGCTRL    (APB_ETH_BASE+0xFFC/4)
+
+#define APB_ETH_RXPINGCTRL    (APB_ETH_BASE+0x17FC/4)
+
+#define APB_ETH_RXPONGCTRL    (APB_ETH_BASE+0x1FFC/4)
 
 // Flush data cache with VexRiscv
 // This is dependent on the Riscv implementation since flushing datacache
@@ -102,6 +157,13 @@ void UartWrite(uint8_t ch);
 int UartReadAvailable();
 
 int UartWriteAvailable();
+
+ZtaStatus EthernetLiteInit(uint8_t *macAddr);
+
+int EthernetLiteSend(uint8_t *pkt,int pktLen);
+
+int EthernetLiteReceive(uint8_t *pkt,int pktLen);
+
 #ifdef __cplusplus
 }
 #endif

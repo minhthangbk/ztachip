@@ -188,3 +188,81 @@ int UartWriteAvailable() {
    return (int)APB[APB_UART_WRITE_AVAIL];
 }
 
+
+//---------------------------------------------------------
+// Initialize Ethernet driver
+//---------------------------------------------------------
+
+ZtaStatus EthernetLiteInit(uint8_t macAddr[6]) {
+   // Always hardcoded for now
+   macAddr[0] = 0x00;
+   macAddr[1] = 0x00;
+   macAddr[2] = 0x5E;
+   macAddr[3] = 0x00;
+   macAddr[4] = 0xFA;
+   macAddr[5] = 0xCE;
+   return ZtaStatusOk;
+}
+
+//--------------------------------------------------------------
+// Simple Ethernet Driver based on Xilinx EthernetLite IP
+// Primarily used to download files (such as LLM model) 
+// with TFTP 
+// This function is blocked until the Ethernet packet can be sent
+//--------------------------------------------------------------
+
+int EthernetLiteSend(uint8_t *pkt,int pktLen)
+{
+   int cnt;
+   uint32_t start;
+   
+   start=TimeGet();
+   cnt = (pktLen+3)/4;
+   while(APB[APB_ETH_TXPINGCTRL] & 0x1) {
+      while((int)TimeGet()-(int)start > 5000)
+         return 0;
+   }
+   for(int i=0;i < cnt;i++,pkt+=4) {
+      APB[APB_ETH_TXPINGBUF+i] = *((uint32_t*)pkt);
+   }
+   APB[APB_ETH_TXPINGLEN] = pktLen;
+   APB[APB_ETH_TXPINGCTRL] = 1;
+   return pktLen;
+}
+
+//-------------------------------------------------------
+// Simple Ethernet Driver based on Xilinx EthernetLite IP
+// Primarily used to download files (such as LLM model) 
+// with TFTP 
+// This function is blocked until an Ethernet packet is 
+// received
+//-------------------------------------------------------
+
+int EthernetLiteReceive(uint8_t *pkt,int pktLen)
+{
+   static int nextBuf=0;
+   int cnt=pktLen/4; 
+
+   if(nextBuf==0 && APB[APB_ETH_RXPINGCTRL] & 0x1)
+   {
+      for(int i=0;i < cnt;i++,pkt+=4) {
+         *((uint32_t*)pkt) = APB[APB_ETH_RXPINGBUF+i];
+      }
+      APB[APB_ETH_RXPINGCTRL] = 0;
+      nextBuf=1;
+      return cnt*4;
+   }
+   if(nextBuf==1 && APB[APB_ETH_RXPONGCTRL] & 0x1)
+   {
+      for(int i=0;i < cnt;i++,pkt+=4) {
+         *((uint32_t*)pkt) = APB[APB_ETH_RXPONGBUF+i];
+      }
+      APB[APB_ETH_RXPONGCTRL] = 0;
+      nextBuf=0;
+      return cnt*4;
+   }
+   return 0;
+}
+
+
+

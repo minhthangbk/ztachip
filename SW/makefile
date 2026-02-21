@@ -36,6 +36,7 @@ SRCS = 	base/newlib.c \
 	base/graph.cpp \
 	base/crt.S \
 	base/task.S \
+	base/net.cpp \
 	src/test.cpp \
 	src/vision_ai.cpp \
 	src/mpy.cpp \

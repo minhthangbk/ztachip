@@ -36,6 +36,13 @@
 
 #define ZUF_VERSION 0 // Current supported version
 
+typedef struct {
+    uint8_t magicNumber[8];
+    uint8_t len[4];
+    uint8_t reserved[20];
+} ZUF_HEADER;
+
+
 enum ZUF_TYPE {
     ZUF_TYPE_EOF = 0,
     ZUF_TYPE_UINT32 = 1,
@@ -91,6 +98,10 @@ private:
     inline void write(void* buf, size_t bufLen) {
         fwrite(buf, 1, bufLen, m_fp);
         m_wpos += bufLen;
+    }
+    inline void writeReset() {
+        fseek(m_fp,0,SEEK_SET);
+        m_wpos = 0;
     }
     bool findKey(const char* key, ZUF_CONFIG_ELE& ele);
     void writeConfig(ZUF_TYPE type, const char* key, uint32_t numItems, void* items);

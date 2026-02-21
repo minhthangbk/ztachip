@@ -420,5 +420,6 @@ int kernel_ref_llm_find_max(float16_t *x,uint32_t N) {
 
 // Not implemented yet...
 int kernel_ref_llm_find_k_max(float16_t* x, uint32_t _N, int K, int* top, float* topp) {
+
     return 0;
 }

@@ -77,7 +77,7 @@ entity axi_apb_bridge is
         
         -- APB interface
         apb_paddr_out              : OUT STD_LOGIC_VECTOR(19 downto 0);
-        apb_penable_out            : OUT STD_LOGIC;
+        apb_penable_out            : OUT STD_LOGIC_VECTOR(apb_max_devices_c-1 DOWNTO 0);
         apb_pready_in              : IN STD_LOGIC;
         apb_pwrite_out             : OUT STD_LOGIC;
         apb_pwdata_out             : OUT STD_LOGIC_VECTOR(31 downto 0);
@@ -294,8 +294,6 @@ apb_paddr_out <= paddr_r;
 
 apb_pwrite_out <=  write_in_progress_r;
 
-apb_penable_out <= write_in_progress_r or read_in_progress_r;
-
 apb_pwdata_out <= wdata_read_rec(axi_wdata_t'length-1 downto 0);
 
 -- Latch read response from APB
@@ -308,6 +306,13 @@ rresp_write_rec(axi_rdata_t'length-1 downto 0) <= apb_prdata_in;
 
 wresp_write_rec <= wcmd_read_rec(wcmd_read_rec'length-1 downto axi_awaddr_t'length);
 
+-- Update apb_penable_out to activate apb device according to its memory address.
+
+process(paddr_r,write_in_progress_r,read_in_progress_r)
+begin
+apb_penable_out <= (others=>'0');
+apb_penable_out(to_integer(unsigned(paddr_r(apb_addr_len_c-1 downto 16)))) <= write_in_progress_r or read_in_progress_r;
+end process;
 
 process(write_in_progress_r,apb_pready_in,read_in_progress_r,
         rcmd_empty,rresp_full,wcmd_empty,wdata_empty,wresp_full,
