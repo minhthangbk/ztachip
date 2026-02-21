@@ -93,6 +93,8 @@ llama::llama() {
     m_samplingThreshold=0.0f;
     m_minp = 0.0f;
     m_samplingScale=1.0f;
+    m_maxTokenResponse = -1;
+    m_numTokenResponse = 0;
     m_stat.numTokens = 0;
     m_stat.totalTime = 0;
 }
@@ -416,7 +418,7 @@ void llama::Close() {
 // p is the accumulate probability threshold that we can choose the tokens. A large
 // p allows less likely tokens to be chosen.
 
-ZtaStatus llama::SetSamplingPolicy(float temperature,float p,float min_p,int k) {
+ZtaStatus llama::SetSamplingPolicy(float temperature,float p,float min_p,int k,int maxTokenResponse) {
     if(temperature==0)
         return ZtaStatusFail;
     if(p < 0.0 || p > 1.0)
@@ -428,6 +430,7 @@ ZtaStatus llama::SetSamplingPolicy(float temperature,float p,float min_p,int k) 
     m_minp = min_p;
     m_samplingScale = 1/temperature;
     m_samplingK = k;
+    m_maxTokenResponse = maxTokenResponse;
     return ZtaStatusOk;
 }
 
@@ -693,6 +696,7 @@ ZtaStatus llama::SystemPrompt(char *prompt) {
 
 ZtaStatus llama::UserPrompt(char *userPrompt,std::string *output) {
     int token=0;
+    int lastToken=-1;
     float16_t* logits;
     char* piece;
     int pos;
@@ -713,6 +717,7 @@ ZtaStatus llama::UserPrompt(char *userPrompt,std::string *output) {
     m_promptTokens.push_back(m_tokenizer->m_special.BOS);
     m_tokenizer->StringToToken((char*)"assistant", 1, 0, m_promptTokens);
     m_promptTokens.push_back(m_tokenizer->m_special.NL);
+    m_numTokenResponse=0;
     pos = 0;
     startTime = TIMEGET();
     while(cont) {
@@ -728,6 +733,7 @@ ZtaStatus llama::UserPrompt(char *userPrompt,std::string *output) {
             logits = forward(m_promptTokens[pos], pos+m_pos+m_pos2);
             m_stat.numTokens++;
             token = sampling(logits);
+            lastToken = token;
             piece = m_tokenizer->TokenToString(token, token);
             safe_printf(piece);
             fflush(stdout);
@@ -735,7 +741,15 @@ ZtaStatus llama::UserPrompt(char *userPrompt,std::string *output) {
         } else {
             logits = forward(token, pos+m_pos+m_pos2);
             m_stat.numTokens++;
+            m_numTokenResponse++;
             token = sampling(logits);
+            if(m_maxTokenResponse >= 0 && (m_numTokenResponse > m_maxTokenResponse)) {
+                if(token==m_tokenizer->m_special.NL && lastToken==m_tokenizer->m_special.NL) {
+                    // Good place to break even if it is not EOS token
+                    break;
+                }
+            }
+            lastToken = token;
             pos++;
             piece = m_tokenizer->TokenToString(token,token);
             if(token==m_tokenizer->m_special.EOS)

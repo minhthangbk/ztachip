@@ -88,7 +88,7 @@ int chat() {
 #endif
 
 //      ai.SetSamplingPolicy(0.8,0.950,40); // temperature=0.8,threshold=0.9;top-k=20
-      ai.SetSamplingPolicy(0.7,0.9,0.05,40);
+      ai.SetSamplingPolicy(0.3,0.9,0.05,40,40); // temperature=0.7,p-threshold=0.9;min_p=0.05,top-k=40,maxResp=-1 (no-limit)
 //      ai.SetSamplingPolicyGreedy();
 #ifdef __WIN32__
     ai.SystemPrompt((char*)"You are a helpful assistant.");
@@ -112,7 +112,7 @@ int chat() {
 #endif
 #ifndef __WIN32__
     printf("I am a chatbot. Hit Ctrl+C to interrupt me.\r\n");
-    ai.SystemPrompt((char*)"You are a helpful assistance");
+    ai.SystemPrompt((char*)"You answer questions briefly");
     for(;;) {
         char *prompt = getInput();
         if(prompt) {

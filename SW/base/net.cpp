@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
+#include <assert.h>
 #include "util.h"
 #include "../src/soc.h"
 
@@ -30,7 +31,7 @@
 
 #define UDP_HDR 8
 
-#define MAX_PKT 1600
+#define MAX_PKT 600 // TFTP never need more than this
 
 #define TFTP_BLOCK 512
 
@@ -205,7 +206,7 @@ ZtaStatus NetInit(uint32_t localIP) {
 size_t NetTftpDownload(uint32_t serverIP,char *fileName,uint8_t *buf,size_t bufSize,bool printProgress) {
     uint8_t serverMAC[6];
     static uint8_t dataRsp[MAX_PKT];
-    static uint8_t rrq[600];
+    uint8_t rrq[32];
     uint8_t ack[4];
     int rrqLen;
     uint16_t localPort=40000;
@@ -215,6 +216,7 @@ size_t NetTftpDownload(uint32_t serverIP,char *fileName,uint8_t *buf,size_t bufS
     int retry;
     uint32_t start;
     int lastPrintTotal=0;
+    bool eof=false;
 
     if(printProgress)
         printf("\r\n");
@@ -227,6 +229,7 @@ size_t NetTftpDownload(uint32_t serverIP,char *fileName,uint8_t *buf,size_t bufS
     rrqLen+=strlen(fileName)+1;
     strcpy((char*)rrq+rrqLen,"octet");
     rrqLen+=6;
+    assert(rrqLen < sizeof(rrq));
 
     if(sendUdp(serverMAC,serverIP,localPort,serverPort,rrq,rrqLen)==0)
         return 0;
@@ -269,22 +272,8 @@ size_t NetTftpDownload(uint32_t serverIP,char *fileName,uint8_t *buf,size_t bufS
             uint16_t block=(tftp[2]<<8)|tftp[3];
             int dataLen = udpPayloadLen - 4;
             if(block==expectedBlock) {
-                if(total < bufSize) {
-                    len = (bufSize-total);
-                    if(len > dataLen)
-                        len = dataLen;
-                    memcpy(buf+total,tftp+4,len);
-                }
-                total+=dataLen;
-                if(printProgress) {
-                    if(total-lastPrintTotal > 1000000) {
-                        printf("%d/%dM\r",total/1000000,bufSize/1000000); // Print every 10M
-                        fflush(stdout);
-                        lastPrintTotal = total;
-                    }
-                }
                 if(total > bufSize) {
-                    // Running out of buffer. Send ERROR to terminate transfer
+                    // Already running out of buffer. Send ERROR to terminate transfer
                     H2N16(TFTP_ERROR,ack);
                     H2N16(3,ack+2);
                     if(sendUdp(serverMAC,serverIP,localPort,serverPort,ack,4)==0)
@@ -299,11 +288,25 @@ size_t NetTftpDownload(uint32_t serverIP,char *fileName,uint8_t *buf,size_t bufS
                     expectedBlock++;
                     start=TimeGet();
                     retry=0;
-                    if(dataLen<TFTP_BLOCK) {
-                        if(printProgress)
-                            printf("\r\n");
-                        return total;
+                }
+                if(total < bufSize) {
+                    len = (bufSize-total);
+                    if(len > dataLen)
+                        len = dataLen;
+                    memcpy(buf+total,tftp+4,len);
+                }
+                total+=dataLen;
+                if(printProgress) {
+                    if(total-lastPrintTotal > 1000000) {
+                        printf("%d/%dM\r",total/1000000,bufSize/1000000); // Print every 10M
+                        fflush(stdout);
+                        lastPrintTotal = total;
                     }
+                }
+                if(dataLen<TFTP_BLOCK) {
+                    if(printProgress)
+                        printf("\r\n");
+                    return total;
                 }
             }
         }
