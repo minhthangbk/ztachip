@@ -158,7 +158,7 @@ ZtaStatus llama::Open(const char* checkpoint_path) {
 
     m_config.inv_sqrtf_head_size=1/sqrtf(head_size);
 
-    if(!m_zuf.ReadArrayBfloat("token_embd.weight", sz, &m_weights.token_embedding_table))
+    if(!m_zuf.ReadArrayFP16("token_embd.weight", sz, &m_weights.token_embedding_table))
         return ZtaStatusFail;
 
     for(int i=0;i < (int)m_config.n_layers;i++) {
@@ -176,7 +176,7 @@ ZtaStatus llama::Open(const char* checkpoint_path) {
         m_weights.wqq[i].quant = (ZUF_QUANT)quant;
         if(!m_zuf.ReadArrayU8(keyq, sz, &m_weights.wqq[i].q))
             return ZtaStatusFail;
-        if(!m_zuf.ReadArrayBfloat(keys, sz, (float16_t **)&m_weights.wqq[i].s))
+        if(!m_zuf.ReadArrayFP16(keys, sz, (float16_t **)&m_weights.wqq[i].s))
             return ZtaStatusFail;
     }
 
@@ -189,7 +189,7 @@ ZtaStatus llama::Open(const char* checkpoint_path) {
         m_weights.wkq[i].quant = (ZUF_QUANT)quant;
         if(!m_zuf.ReadArrayU8(keyq, sz, &m_weights.wkq[i].q))
             return ZtaStatusFail;
-        if(!m_zuf.ReadArrayBfloat(keys, sz, (float16_t **) & m_weights.wkq[i].s))
+        if(!m_zuf.ReadArrayFP16(keys, sz, (float16_t **) & m_weights.wkq[i].s))
             return ZtaStatusFail;
     }
 
@@ -202,7 +202,7 @@ ZtaStatus llama::Open(const char* checkpoint_path) {
         m_weights.wvq[i].quant = (ZUF_QUANT)quant;
         if(!m_zuf.ReadArrayU8(keyq, sz, &m_weights.wvq[i].q))
             return ZtaStatusFail;
-        if(!m_zuf.ReadArrayBfloat(keys, sz, (float16_t **) & m_weights.wvq[i].s))
+        if(!m_zuf.ReadArrayFP16(keys, sz, (float16_t **) & m_weights.wvq[i].s))
             return ZtaStatusFail;
     }
 
@@ -215,7 +215,7 @@ ZtaStatus llama::Open(const char* checkpoint_path) {
         m_weights.woq[i].quant = (ZUF_QUANT)quant;
         if(!m_zuf.ReadArrayU8(keyq, sz, &m_weights.woq[i].q))
             return ZtaStatusFail;
-        if(!m_zuf.ReadArrayBfloat(keys, sz, (float16_t **) & m_weights.woq[i].s))
+        if(!m_zuf.ReadArrayFP16(keys, sz, (float16_t **) & m_weights.woq[i].s))
             return ZtaStatusFail;
     }
 
@@ -234,7 +234,7 @@ ZtaStatus llama::Open(const char* checkpoint_path) {
         m_weights.w1q[i].quant = (ZUF_QUANT)quant;
         if(!m_zuf.ReadArrayU8(keyq, sz, &m_weights.w1q[i].q))
             return ZtaStatusFail;
-        if(!m_zuf.ReadArrayBfloat(keys, sz, (float16_t **) & m_weights.w1q[i].s))
+        if(!m_zuf.ReadArrayFP16(keys, sz, (float16_t **) & m_weights.w1q[i].s))
             return ZtaStatusFail;
     }
 
@@ -247,7 +247,7 @@ ZtaStatus llama::Open(const char* checkpoint_path) {
         m_weights.w2q[i].quant = (ZUF_QUANT)quant;
         if(!m_zuf.ReadArrayU8(keyq, sz, &m_weights.w2q[i].q))
             return ZtaStatusFail;
-        if(!m_zuf.ReadArrayBfloat(keys, sz, (float16_t **) & m_weights.w2q[i].s))
+        if(!m_zuf.ReadArrayFP16(keys, sz, (float16_t **) & m_weights.w2q[i].s))
             return ZtaStatusFail;
     }
 
@@ -260,7 +260,7 @@ ZtaStatus llama::Open(const char* checkpoint_path) {
         m_weights.w3q[i].quant = (ZUF_QUANT)quant;
         if(!m_zuf.ReadArrayU8(keyq, sz, &m_weights.w3q[i].q))
             return ZtaStatusFail;
-        if(!m_zuf.ReadArrayBfloat(keys, sz, (float16_t **) & m_weights.w3q[i].s))
+        if(!m_zuf.ReadArrayFP16(keys, sz, (float16_t **) & m_weights.w3q[i].s))
             return ZtaStatusFail;
     }
 
@@ -271,7 +271,7 @@ ZtaStatus llama::Open(const char* checkpoint_path) {
     m_weights.wclsq.quant = (ZUF_QUANT)quant;
     if(!m_zuf.ReadArrayU8("output.weight.q", sz, &m_weights.wclsq.q))
         return ZtaStatusFail;
-    if(!m_zuf.ReadArrayBfloat("output.weight.s", sz, (float16_t **)(&m_weights.wclsq.s)))
+    if(!m_zuf.ReadArrayFP16("output.weight.s", sz, (float16_t **)(&m_weights.wclsq.s)))
         return ZtaStatusFail;
 
 
@@ -480,7 +480,7 @@ float16_t* llama::forward(int token, int pos) {
 
         x = (l==0)?content_row:m_runtime.x;
 
-        kernel_llm_rms_exe(-1,dim,x,m_runtime.xb,m_weights.rms_att_weight[l]);
+        kernel_llm_rms_exe(-1,dim,x,(l==0),m_runtime.xb,m_weights.rms_att_weight[l]);
 
         // key and value point to the kv cache
         int loff = l * m_config.seq_len * kv_dim; // kv cache layer offset for convenience
@@ -535,9 +535,9 @@ float16_t* llama::forward(int token, int pos) {
 
         matmul(-1,dim, dim, GS, m_runtime.xbq.q,m_runtime.xbq.s, &m_weights.woq[l], m_runtime.xb2);
 
-        kernel_llm_residual_exe(-1,dim,x,m_runtime.x,m_runtime.xb2);
+        kernel_llm_residual_exe(-1,dim,x,(l==0),m_runtime.x,m_runtime.xb2);
 
-        kernel_llm_rms_exe(-1,dim,m_runtime.x,m_runtime.xb,m_weights.rms_ffn_weight[l]);
+        kernel_llm_rms_exe(-1,dim,m_runtime.x,false,m_runtime.xb,m_weights.rms_ffn_weight[l]);
 
         kernel_llm_quantize_exe(-1,dim,m_runtime.xb,m_runtime.xbq.s,m_runtime.xbq.q);
 
@@ -555,13 +555,13 @@ float16_t* llama::forward(int token, int pos) {
 
         matmul(-1,hidden_dim, dim, GS,m_runtime.hbq.q,m_runtime.hbq.s, &m_weights.w2q[l],m_runtime.xb);
 
-        kernel_llm_residual_exe(-1,dim,m_runtime.x,m_runtime.x,m_runtime.xb); 
+        kernel_llm_residual_exe(-1,dim,m_runtime.x,false,m_runtime.x,m_runtime.xb); 
 #ifndef __WIN32__
         while(ztaReadResponse(&resp)) {}
 #endif
     }
 
-    kernel_llm_rms_exe(-1,dim,m_runtime.x,m_runtime.x,m_weights.rms_final_weight);
+    kernel_llm_rms_exe(-1,dim,m_runtime.x,false,m_runtime.x,m_weights.rms_final_weight);
     // classifier into logits
 
     kernel_llm_quantize_exe(-1,dim,m_runtime.x,m_runtime.xq.s,m_runtime.xq.q);
@@ -599,13 +599,7 @@ int llama::sampling(float16_t* _logits) {
     if(m_samplingGreedy)
         return kernel_llm_find_max(_logits, m_config.vocab_size);
 
-    kernel_llm_scale_exe(- 1, m_config.vocab_size, _logits, m_samplingScale);
-
-    // Find the top-k
-
-    kernel_llm_done();
-
-    kernel_llm_find_k_max(_logits,m_config.vocab_size,m_samplingK,top,toppbf);
+    kernel_llm_find_k_max(_logits,m_config.vocab_size,m_samplingK,m_samplingScale,top,toppbf);
 
     kernel_llm_done();  
     

@@ -229,20 +229,26 @@ void kernel_ref_llm_quantize_exe(int reqId,int N,float16_t *x,float16_t *s,int16
 // Reference kernel function implementing RMSNorm
 //--------------------------------------------------------------------------
 
-void kernel_ref_llm_rms_exe(int reqId,int N,float16_t *x,float16_t *o,float *w) {
+void kernel_ref_llm_rms_exe(int reqId,int N,float16_t *x,bool x_is_fp16,float16_t *o,float *w) {
     // calculate sum of squares
     float ss = 0.0f;
     float f;
 
     for (int j = 0; j < N; j++) {
-        ss += BF2F(x[j]) * BF2F(x[j]);
+        if(x_is_fp16)
+            ss += FP16_2_F(x[j]) * FP16_2_F(x[j]);
+        else
+            ss += BF2F(x[j]) * BF2F(x[j]);
     }
     ss /= N;
     ss += 1e-5f;
     ss = 1.0f / sqrtf(ss);
     // normalize and scale
     for (int j = 0; j < N; j++) {
-        f = w[j] * (ss * BF2F(x[j]));
+        if(x_is_fp16)
+            f = w[j] * (ss * FP16_2_F(x[j]));
+        else
+            f = w[j] * (ss * BF2F(x[j]));
         o[j] = F2BF(f);
     }
 }
@@ -337,6 +343,7 @@ void kernel_ref_llm_residual_exe(
    int reqId,
    int N,
    float16_t *x,
+   bool x_is_fp16,
    float16_t *y,
    float16_t *xb
    )
@@ -344,7 +351,10 @@ void kernel_ref_llm_residual_exe(
     float f;
 
     for (int i = 0; i < N; i++) {
-        f = BF2F(x[i]) + BF2F(xb[i]);
+        if(x_is_fp16)
+            f = FP16_2_F(x[i]) + BF2F(xb[i]);
+        else
+            f = BF2F(x[i]) + BF2F(xb[i]);
         y[i] = F2BF(f);
     }
 }
@@ -395,16 +405,6 @@ void kernel_ref_llm_softmax_exe(int reqId,float16_t *x,int N) {
 }
 
 //-------------------------------------------------------------------------
-// Reference kernel function implementing scaling
-//-------------------------------------------------------------------------
-
-void kernel_ref_llm_scale_exe(int reqId,int N,float16_t *x,float scale) {
-    for(int i=0;i < N;i++) {
-        x[i] = F2BF(BF2F(x[i]) * scale);
-    }
-}
-
-//-------------------------------------------------------------------------
 // Reference kernel function for greedy sampling
 //-------------------------------------------------------------------------
 
@@ -419,7 +419,7 @@ int kernel_ref_llm_find_max(float16_t *x,uint32_t N) {
 }
 
 // Not implemented yet...
-int kernel_ref_llm_find_k_max(float16_t* x, uint32_t _N, int K, int* top, float* topp) {
+int kernel_ref_llm_find_k_max(float16_t* x, uint32_t _N, int K, float scale,int* top, float* topp) {
 
     return 0;
 }

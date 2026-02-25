@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <assert.h>
 #include "util.h"
 #include "../src/soc.h"
 
@@ -31,8 +32,6 @@
 
 #define UDP_HDR 8
 
-#define MAX_PKT 600 // TFTP never need more than this
-
 #define TFTP_BLOCK 512
 
 #define ARP_TIMEOUT 1000
@@ -46,6 +45,10 @@
 static uint8_t local_mac[6] = {0x00,0x00,0x5E,0x00,0xFA,0xCE};
 
 static uint32_t local_ip = 0x0A0A0A01;
+
+static uint8_t txpacket[100];
+
+static uint8_t rxpacket[600];
 
 // Calculate IP checksum
 
@@ -62,7 +65,7 @@ static uint16_t checksum(uint8_t *buf) {
 // the request is for my ip address
 
 static int ethRx(uint8_t *pkt, int len) {
-    static uint8_t arpReply[64];
+    uint8_t arpReply[64];
     uint32_t targetIP;
 
     len = EthernetLiteReceive(pkt,len);
@@ -113,7 +116,7 @@ static int ethRx(uint8_t *pkt, int len) {
 // Resolve peer IP address using ARP protocol
 
 static bool arpResolve(uint32_t targetIP,uint8_t *targetMAC) {
-    static uint8_t arpPkt[64];
+    uint8_t arpPkt[64];
     uint32_t start;
     int retry=0;
 
@@ -163,13 +166,13 @@ static int sendUdp(uint8_t *dstMAC,uint32_t dstIP,
                     uint16_t srcPort,uint16_t dstPort,
                     uint8_t *payload,int payloadLen) {
     uint16_t cs;
-    static uint8_t udpPkt[MAX_PKT];
+    int pktLen;
 
-    memcpy(udpPkt,dstMAC,6);
-    memcpy(udpPkt+6,local_mac,6);
-    H2N16(ETH_TYPE_IP,udpPkt+12);
+    memcpy(txpacket,dstMAC,6);
+    memcpy(txpacket+6,local_mac,6);
+    H2N16(ETH_TYPE_IP,txpacket+12);
 
-    uint8_t *ip=udpPkt+ETH_HDR;
+    uint8_t *ip=txpacket+ETH_HDR;
     ip[0]=0x45;
     ip[1]=0;
     H2N16(IP_HDR+UDP_HDR+payloadLen,ip+2);
@@ -191,7 +194,9 @@ static int sendUdp(uint8_t *dstMAC,uint32_t dstIP,
 
     memcpy(udp+8,payload,payloadLen);
 
-    return EthernetLiteSend(udpPkt,ETH_HDR+IP_HDR+UDP_HDR+payloadLen);
+    pktLen=ETH_HDR+IP_HDR+UDP_HDR+payloadLen;
+    assert(pktLen < (int)sizeof(txpacket));
+    return EthernetLiteSend(txpacket,pktLen);
 }
 
 // Initialize NET layer
@@ -205,7 +210,6 @@ ZtaStatus NetInit(uint32_t localIP) {
 
 size_t NetTftpDownload(uint32_t serverIP,char *fileName,uint8_t *buf,size_t bufSize,bool printProgress) {
     uint8_t serverMAC[6];
-    static uint8_t dataRsp[MAX_PKT];
     uint8_t rrq[32];
     uint8_t ack[4];
     int rrqLen;
@@ -229,7 +233,7 @@ size_t NetTftpDownload(uint32_t serverIP,char *fileName,uint8_t *buf,size_t bufS
     rrqLen+=strlen(fileName)+1;
     strcpy((char*)rrq+rrqLen,"octet");
     rrqLen+=6;
-    assert(rrqLen < sizeof(rrq));
+    assert(rrqLen < (int)sizeof(rrq));
 
     if(sendUdp(serverMAC,serverIP,localPort,serverPort,rrq,rrqLen)==0)
         return 0;
@@ -252,10 +256,10 @@ size_t NetTftpDownload(uint32_t serverIP,char *fileName,uint8_t *buf,size_t bufS
             start=TimeGet();
             continue;
         }
-        int len=ethRx(dataRsp,sizeof(dataRsp));
+        int len=ethRx(rxpacket,sizeof(rxpacket));
         if(len<=0) continue;
-        if(((dataRsp[12]<<8)|dataRsp[13])!=ETH_TYPE_IP) continue;
-        uint8_t *ip=dataRsp+ETH_HDR;
+        if(((rxpacket[12]<<8)|rxpacket[13])!=ETH_TYPE_IP) continue;
+        uint8_t *ip=rxpacket+ETH_HDR;
         if(ip[9]!=IP_PROTO_UDP) continue;
         uint8_t *udp=ip+IP_HDR;
         uint16_t srcPort=(udp[0]<<8)|udp[1];

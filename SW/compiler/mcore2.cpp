@@ -199,9 +199,11 @@ static void genParm(FILE *out,uint32_t _attr,std::string &type,std::string &parm
    if(type.length()==0)
       _attr |= FPU_SET_W_FP32;
    else if(strcasecmp(type.c_str(),"bfloat")==0)
-      _attr |= FPU_SET_W_FP16; 
+      _attr |= FPU_SET_W_BFLOAT; 
    else if(strcasecmp(type.c_str(),"zfloat")==0)
       _attr |= FPU_SET_W_ZFP16; 
+   else if(strcasecmp(type.c_str(),"float16")==0)
+      _attr |= FPU_SET_W_FP16; 
    else if(strcasecmp(type.c_str(),"float")==0) 
       _attr |= FPU_SET_W_FP32;
    else if(strcasecmp(type.c_str(),"int16")==0) 

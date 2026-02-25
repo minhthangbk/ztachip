@@ -116,9 +116,10 @@ static const size_t GGUF_TYPE_SIZE[GGUF_TYPE_COUNT] = {
 
 // Convert from float32 to bfloat
 
-static void float32to16(float *x,float16_t *y,int N) {
+static void float32tofp16(float *x,float16_t *y,int N) {
     for(int i=0;i < N;i++) {
-        y[i] = F2BF(x[i]);
+        y[i] = F2FP16(x[i]);
+        assert((y[i] & 0x7fff) < 0x7C00); // Dont expect scale of embedded vector to exceed FP16 scale
     }
 }
 
@@ -447,15 +448,17 @@ ZtaStatus GGUF::quantize(float* x, size_t sz, int N, int D,bool reorder,ZUF_QUAN
         scale = found_scale;
         // Convert to bfloat
 #endif
+        float16_t scale_fp16 = F2FP16(scale);
+        assert((scale_fp16 & 0x7fff) < 0x7C00); // Not expecting weight scale to exceed max allowed by FP16
         if(!reorder) {
-            m_qs[group] = (uint16_t)(*((uint32_t*)(&scale)) >> 16);
+            m_qs[group] = scale_fp16;
         }
         else {
             // Reorder the tensor dimensions for optimum data transfer from DDR to PCORE memory space
             int x, y;
             x = group % N2;
             y = group / N2;
-            m_qs[y + x * D] = (uint16_t)(*((uint32_t*)(&scale)) >> 16);
+            m_qs[y + x * D] = scale_fp16;
             assert((y+x*D) < num_groups);
         }
 
@@ -675,7 +678,7 @@ ZtaStatus GGUF::SaveAsZUF(const char* modelName,bool forSim,ZUF_QUANT quant) {
         quantize((float*)tensor, sz, dim, dim,!forSim,quant);
         zuf.WriteItemU32(keyf, quant);
         zuf.WriteItemArrayU8(keyq,(quant==ZUF_QUANT_INT4)?(sz/2):sz, (uint8_t *)m_qq);
-        zuf.WriteItemArrayBFLOAT(keys, (uint32_t)(sz/GS_DEFAULT), (float16_t*)m_qs);
+        zuf.WriteItemArrayFP16(keys, (uint32_t)(sz/GS_DEFAULT), (float16_t*)m_qs);
     }
 
     // wk . Should be Q4
@@ -689,7 +692,7 @@ ZtaStatus GGUF::SaveAsZUF(const char* modelName,bool forSim,ZUF_QUANT quant) {
         quantize((float*)tensor, sz, dim, ((dim * n_kv_heads) / n_heads),!forSim,quant);
         zuf.WriteItemU32(keyf, quant);
         zuf.WriteItemArrayU8(keyq,(quant==ZUF_QUANT_INT4)?(sz/2):sz, (uint8_t*)m_qq);
-        zuf.WriteItemArrayBFLOAT(keys, (uint32_t)(sz / GS_DEFAULT), (float16_t*)m_qs);
+        zuf.WriteItemArrayFP16(keys, (uint32_t)(sz / GS_DEFAULT), (float16_t*)m_qs);
     }
 
     // wv. Should be Q4
@@ -703,7 +706,7 @@ ZtaStatus GGUF::SaveAsZUF(const char* modelName,bool forSim,ZUF_QUANT quant) {
         quantize((float*)tensor, sz, dim, ((dim * n_kv_heads) / n_heads),!forSim,quant);
         zuf.WriteItemU32(keyf, quant);
         zuf.WriteItemArrayU8(keyq,(quant==ZUF_QUANT_INT4)?(sz/2):sz, (uint8_t*)m_qq);
-        zuf.WriteItemArrayBFLOAT(keys, (uint32_t)(sz / GS_DEFAULT), (float16_t*)m_qs);
+        zuf.WriteItemArrayFP16(keys, (uint32_t)(sz / GS_DEFAULT), (float16_t*)m_qs);
     }
 
     // wo. Should be Q4
@@ -717,7 +720,7 @@ ZtaStatus GGUF::SaveAsZUF(const char* modelName,bool forSim,ZUF_QUANT quant) {
         quantize((float*)tensor, sz, dim, dim,!forSim,quant);
         zuf.WriteItemU32(keyf, quant);
         zuf.WriteItemArrayU8(keyq,(quant==ZUF_QUANT_INT4)?(sz/2):sz, (uint8_t*)m_qq);
-        zuf.WriteItemArrayBFLOAT(keys, (uint32_t)(sz/GS_DEFAULT), (float16_t*)m_qs);
+        zuf.WriteItemArrayFP16(keys, (uint32_t)(sz/GS_DEFAULT), (float16_t*)m_qs);
     }
 
     // Should be F32
@@ -740,7 +743,7 @@ ZtaStatus GGUF::SaveAsZUF(const char* modelName,bool forSim,ZUF_QUANT quant) {
         quantize((float*)tensor, sz, dim, hidden_dim,!forSim,quant);
         zuf.WriteItemU32(keyf, quant);
         zuf.WriteItemArrayU8(keyq,(quant==ZUF_QUANT_INT4)?(sz/2):sz, (uint8_t*)m_qq);
-        zuf.WriteItemArrayBFLOAT(keys, (uint32_t)(sz / GS_DEFAULT), m_qs);
+        zuf.WriteItemArrayFP16(keys, (uint32_t)(sz / GS_DEFAULT), m_qs);
     }
 
     // w3. Should be Q4
@@ -755,7 +758,7 @@ ZtaStatus GGUF::SaveAsZUF(const char* modelName,bool forSim,ZUF_QUANT quant) {
         quantize((float*)tensor, sz, dim, hidden_dim,!forSim,quant);
         zuf.WriteItemU32(keyf,quant);
         zuf.WriteItemArrayU8(keyq,(quant==ZUF_QUANT_INT4)?(sz/2):sz, (uint8_t*)m_qq);
-        zuf.WriteItemArrayBFLOAT(keys, (uint32_t)(sz / GS_DEFAULT), m_qs);   
+        zuf.WriteItemArrayFP16(keys, (uint32_t)(sz / GS_DEFAULT), m_qs);   
     }
 
     // w2. Should be Q4
@@ -770,7 +773,7 @@ ZtaStatus GGUF::SaveAsZUF(const char* modelName,bool forSim,ZUF_QUANT quant) {
         quantize((float*)tensor, sz, hidden_dim, dim,!forSim,quant);
         zuf.WriteItemU32(keyf,quant);
         zuf.WriteItemArrayU8(keyq,(quant==ZUF_QUANT_INT4)?(sz/2):sz,(uint8_t*)m_qq);
-        zuf.WriteItemArrayBFLOAT(keys, (uint32_t)(sz / GS_DEFAULT), m_qs);   
+        zuf.WriteItemArrayFP16(keys, (uint32_t)(sz / GS_DEFAULT), m_qs);   
     }
 
     // rms_final_weight. Should be F32
@@ -783,13 +786,13 @@ ZtaStatus GGUF::SaveAsZUF(const char* modelName,bool forSim,ZUF_QUANT quant) {
         quantize((float*)tensor, sz, dim, vocab_size,!forSim,ZUF_QUANT_INT8);
         zuf.WriteItemU32("output.weight.f", ZUF_QUANT_INT8);
         zuf.WriteItemArrayU8("output.weight.q", (uint32_t)(sz), (uint8_t*)m_qq);
-        zuf.WriteItemArrayBFLOAT("output.weight.s", (uint32_t)(sz / GS_DEFAULT), m_qs);
+        zuf.WriteItemArrayFP16("output.weight.s", (uint32_t)(sz / GS_DEFAULT), m_qs);
     }
     else if(GetFloat32Tensor("token_embd.weight", sz, &tensor)) {
         quantize((float*)tensor, sz, dim, vocab_size,!forSim,ZUF_QUANT_INT8);
         zuf.WriteItemU32("output.weight.f", ZUF_QUANT_INT8);
         zuf.WriteItemArrayU8("output.weight.q", (uint32_t)(sz), (uint8_t*)m_qq);
-        zuf.WriteItemArrayBFLOAT("output.weight.s", (uint32_t)(sz / GS_DEFAULT), m_qs);
+        zuf.WriteItemArrayFP16("output.weight.s", (uint32_t)(sz / GS_DEFAULT), m_qs);
     }
     else
         return ZtaStatusFail;
@@ -797,8 +800,8 @@ ZtaStatus GGUF::SaveAsZUF(const char* modelName,bool forSim,ZUF_QUANT quant) {
     // w->token_embedding_table
     if (!GetFloat32Tensor("token_embd.weight", sz, &tensor))
         return ZtaStatusFail;
-    float32to16((float *)tensor,(float16_t *)tensor,sz);
-    zuf.WriteItemArrayBFLOAT("token_embd.weight", (uint32_t)sz, (float16_t*)tensor);
+    float32tofp16((float *)tensor,(float16_t *)tensor,sz);
+    zuf.WriteItemArrayFP16("token_embd.weight", (uint32_t)sz, (float16_t*)tensor);
 
     // Save tokenizer
     strLst.clear();

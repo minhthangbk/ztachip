@@ -34,6 +34,14 @@ SECTIONS {
     PROVIDE (_stack_start = .);
   } > TCM 
 
+  .TCM_DATA (NOLOAD) :
+  {
+    . = ALIGN(4);
+    *(.tcm_data)
+    *(.tcm_data.*)
+    . = ALIGN(4);
+  } > TCM
+
   .bss (NOLOAD) : {
     . = ALIGN(4);
     /* This is used by the startup in order to initialize the .bss secion */

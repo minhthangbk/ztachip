@@ -658,6 +658,8 @@ constant fp32_mantissa_width_c:integer:=23;
 
 subtype fp12_t is std_logic_vector(15 downto 0); 
 
+subtype bfloat_t is std_logic_vector(15 downto 0);
+
 subtype fp16_t is std_logic_vector(15 downto 0);
 
 subtype fp32_t is std_logic_vector(31 downto 0);
@@ -1029,7 +1031,7 @@ end record;
 
 subtype register_t is unsigned(4 downto 0);
 
-subtype register2_t is unsigned(5 downto 0);
+subtype register2_t is unsigned(6 downto 0);
 
 subtype register_addr_t is std_logic_vector(register_t'length+register2_t'length+1-1 downto 0);
 
@@ -1074,9 +1076,9 @@ constant register_vm_toggle_c                   :integer:=9;  -- Toggle current 
 --    W: 0=fp16;1=fp32;2=int8;3=fp32-floor
 -- Register bit field has this format: WW M PPP 
 ---------------------
-constant register2_fpu_set_P_MASK       :std_logic_vector:="000111"; -- Bit mask for P subfield
-constant register2_fpu_set_M_MASK       :std_logic_vector:="001000"; -- Bit mask for M subfield 
-constant register2_fpu_set_W_MASK       :std_logic_vector:="110000"; -- Bit mask for W subfield
+constant register2_fpu_set_P_MASK       :std_logic_vector(6 downto 0):="0000111"; -- Bit mask for P subfield
+constant register2_fpu_set_M_MASK       :std_logic_vector(6 downto 0):="0001000"; -- Bit mask for M subfield 
+constant register2_fpu_set_W_MASK       :std_logic_vector(6 downto 0):="1110000"; -- Bit mask for W subfield
 constant register2_fpu_set_P_A          :integer:=0; -- P subfield to set A parameter
 constant register2_fpu_set_P_B          :integer:=1; -- P subfield to set B parameter
 constant register2_fpu_set_P_C          :integer:=2; -- P subfield to set C parameter
@@ -1084,12 +1086,14 @@ constant register2_fpu_set_P_X          :integer:=3; -- P subfield to set X para
 constant register2_fpu_set_P_Y          :integer:=4; -- P subfield to set Y parameter
 constant register2_fpu_set_P_CNT        :integer:=5; -- P subfield to set CNT parameter
 constant register2_fpu_set_P_C2         :integer:=6; -- P subfield to set C2 parameter
-constant register2_fpu_set_W_FP16       :integer:=0; -- W subfield for FP16 data type
+constant register2_fpu_set_W_BFLOAT     :integer:=0; -- W subfield for BFLOAT data type
 constant register2_fpu_set_W_FP32       :integer:=16; -- W subfield for FP32 data type.
 constant register2_fpu_set_W_INT16      :integer:=32; -- W subfield for INT16 data type.
 constant register2_fpu_set_W_ZFP16      :integer:=48; -- W subfield for ztachip custom FP16
+constant register2_fpu_set_W_FP16       :integer:=64; -- W subfield for FP16 data type
 constant register2_fpu_set_M_VALUE      :integer:=0; -- M subfield for access by value
 constant register2_fpu_set_M_ADDR       :integer:=8; -- M subfield for access by SRAM address
+
 -------
 -- Sub register values associated with register_fpu_exe_c
 -- 3 types of opcodes (defined by subfields below) that can be executed 

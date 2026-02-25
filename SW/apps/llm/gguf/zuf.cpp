@@ -90,7 +90,8 @@ ZtaStatus ZUF::CreateComplete() {
         uint8_t type=ZUF_TYPE_EOF;
         write(&type, 1);
         memset(&h,0,sizeof(h));
-        memcpy(h.magicNumber,"ZTACHIP!",sizeof(h.magicNumber));
+        memcpy(h.magicNumber,ZUF_MAGIC_NUMBER,sizeof(h.magicNumber));
+        H2N(ZUF_VERSION,h.ver);
         H2N((uint32_t)m_wpos,h.len); // Handle small model only
         writeReset();
         write(&h,sizeof(ZUF_HEADER));       
@@ -110,11 +111,12 @@ ZtaStatus ZUF::Open(const char* fname) {
     uint8_t* p;
     ZUF_HEADER h;
     uint32_t size;
+    uint32_t ver;
 
     printf("Downloading model file %s from TFTP server@10.10.10.10 \r\n",fname);
     if (m_buf)
         free(m_buf);
-#if 0
+#ifdef __WIN32__
     m_buf = 0;
     m_top = 0;
     fd = _open(fname, O_RDONLY);
@@ -125,27 +127,24 @@ ZtaStatus ZUF::Open(const char* fname) {
     m_buf = (uint8_t*)malloc(sz+2*BYTE_ALIGNMENT);
     m_top = (uint8_t *)((((size_t)m_buf+BYTE_ALIGNMENT-1)/BYTE_ALIGNMENT)*BYTE_ALIGNMENT);
     p = (uint8_t*)m_top;
-#ifdef __WIN32__
-    sz2 = _read(fd, p, sz);
-//    assert(sz2 == sz);
-#else
-    while (sz > 0) {
-        sz2 = _read(fd, p, MIN(sz,1000000));
-        if (sz2 <= 0) {
-            return ZtaStatusFail;
-        }
-        p += sz2;
-        sz -= sz2;
-        printf(".");
-        fflush(stdout);
-    }
-#endif
-    _close(fd);
-#endif
 
+    sz2 = _read(fd, p, sz);
+    m_top += sizeof(ZUF_HEADER);
+    _close(fd);
+#else
+    printf("Downloading model file %s from TFTP server@10.10.10.10 \r\n", fname);
     sz=NetTftpDownload(0x0a0a0a0a,(char *)fname,(uint8_t *)&h,sizeof(h),false);
     if(sz!=sizeof(h)) {
         printf("Fail to download model file. Check your Ethernet connection \r\n");
+        return ZtaStatusFail;
+    }
+    if(memcmp(h.magicNumber,ZUF_MAGIC_NUMBER,sizeof(h.magicNumber)) != 0) {
+        printf("Invalid ZUF file. This file is a conversion from GGUF by quant program\r\n");
+        return ZtaStatusFail;
+    }
+    N2H(h.ver,ver);
+    if(ver != ZUF_VERSION) {
+        printf("Incompatible version. Regenerate ZUF file again...\r\n");
         return ZtaStatusFail;
     }
     N2H(h.len,size);
@@ -159,6 +158,7 @@ ZtaStatus ZUF::Open(const char* fname) {
     }
     m_top += sizeof(ZUF_HEADER);
     printf("Download completed successfully len=%d \r\n",(int)size);
+#endif
 #endif
     return ZtaStatusOk;
 }
@@ -195,6 +195,7 @@ void ZUF::writeConfig(ZUF_TYPE type,const char *key,uint32_t numItems,void *item
             itemsLen = sizeof(float) * numItems;
             break;
         case ZUF_TYPE_BFLOAT:
+        case ZUF_TYPE_FP16:
             itemsLen = sizeof(float16_t) * numItems;
             break;
         case ZUF_TYPE_STRING:
@@ -245,6 +246,12 @@ void ZUF::WriteItemBfloat(const char* key, float16_t v) {
     writeConfig(ZUF_TYPE_BFLOAT, key, 1, &v);
 }
 
+// Write a configuration item which is a FLOAT16
+
+void ZUF::WriteItemFP16(const char* key, float16_t v) {
+    writeConfig(ZUF_TYPE_FP16, key, 1, &v);
+}
+
 // Write a configuration item which is a string
 
 void ZUF::WriteItemString(const char* key, char *str) {
@@ -267,6 +274,12 @@ void ZUF::WriteItemArrayFloat(const char* key, uint32_t arrSize, float* arr) {
 
 void ZUF::WriteItemArrayBFLOAT(const char* key, uint32_t arrSize, float16_t* arr) {
     writeConfig(ZUF_TYPE_BFLOAT, key, arrSize, arr);
+}
+
+// Write a configuration item which is an array of FLOAT16
+
+void ZUF::WriteItemArrayFP16(const char* key, uint32_t arrSize, float16_t* arr) {
+    writeConfig(ZUF_TYPE_FP16, key, arrSize, arr);
 }
 
 // Write a configuration item which is an array of strings
@@ -374,6 +387,24 @@ bool ZUF::ReadItemBFLOAT(const char* key, float16_t& v) {
     return true;
 }
 
+// Read a configuration item which is a FP16
+
+bool ZUF::ReadItemFP16(const char* key, float16_t& v) {
+    ZUF_CONFIG_ELE ele;
+
+    if (!findKey(key, ele)) {
+        return false;
+    }
+    if (ele.type != ZUF_TYPE_FP16) {
+        return false;
+    }
+    if (ele.lstSize != 1) {
+        return false;
+    }
+    v = *((float16_t*)ele.data);
+    return true;
+}
+
 // Read a configuration item which is a string
 
 bool ZUF::ReadItemString(const char* key,char **str) {
@@ -434,6 +465,23 @@ bool ZUF::ReadArrayBfloat(const char* key, uint32_t& arraySize, float16_t** arra
         return false;
     }
     if (ele.type != ZUF_TYPE_BFLOAT) {
+        return false;
+    }
+    assert((ele.dataLen % sizeof(float16_t)) == 0);
+    arraySize = ele.dataLen / sizeof(float16_t);
+    *array = (float16_t*)ele.data;
+    return true;
+}
+
+// Read a configuration item which is an array of FP16
+
+bool ZUF::ReadArrayFP16(const char* key, uint32_t& arraySize, float16_t** array) {
+    ZUF_CONFIG_ELE ele;
+
+    if (!findKey(key, ele)) {
+        return false;
+    }
+    if (ele.type != ZUF_TYPE_FP16) {
         return false;
     }
     assert((ele.dataLen % sizeof(float16_t)) == 0);

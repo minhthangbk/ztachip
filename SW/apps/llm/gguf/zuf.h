@@ -34,12 +34,15 @@
 #include <string>
 #include "../../../base/types.h"
 
-#define ZUF_VERSION 0 // Current supported version
+#define ZUF_VERSION 1 // Current supported version
+
+#define ZUF_MAGIC_NUMBER "ZTACHIP!"
 
 typedef struct {
     uint8_t magicNumber[8];
-    uint8_t len[4];
-    uint8_t reserved[20];
+    uint8_t len[4]; // Support small model <4G for now
+    uint32_t ver[4]; // Version 
+    uint8_t reserved[16];
 } ZUF_HEADER;
 
 
@@ -50,6 +53,7 @@ enum ZUF_TYPE {
     ZUF_TYPE_BFLOAT = 3,
     ZUF_TYPE_STRING = 4,
     ZUF_TYPE_UINT8 = 5,
+    ZUF_TYPE_FP16 = 6,
     ZUF_TYPE_GAP = 64
 };
 
@@ -79,20 +83,24 @@ public:
     void WriteItemU32(const char* key, uint32_t v);
     void WriteItemFloat(const char* key, float v);
     void WriteItemBfloat(const char* key, float16_t v);
+    void WriteItemFP16(const char* key, float16_t v);
     void WriteItemString(const char* key, char* str);
     void WriteItemArrayU32(const char* key, uint32_t arrSize, uint32_t * arr);
     void WriteItemArrayFloat(const char* key, uint32_t arrSize, float* arr);
     void WriteItemArrayBFLOAT(const char* key, uint32_t arrSize, float16_t * arr);
+    void WriteItemArrayFP16(const char* key, uint32_t arrSize, float16_t * arr);
     void WriteItemArrayString(const char* key, uint32_t arrSize, char* arr);
     void WriteItemArrayU8(const char* key, uint32_t arrSize, uint8_t* arr);
 
     bool ReadItemU32(const char* key, uint32_t& v);
     bool ReadItemFloat(const char* key, float& v);
     bool ReadItemBFLOAT(const char* key, float16_t & v);
+    bool ReadItemFP16(const char* key, float16_t & v);
     bool ReadItemString(const char* key, char** str);
     bool ReadArrayU8(const char* key, uint32_t & arraySize, uint8_t** array);
     bool ReadArrayFloat(const char* key, uint32_t & arraySize, float** array);
     bool ReadArrayBfloat(const char* key, uint32_t & arraySize, float16_t** array);
+    bool ReadArrayFP16(const char* key, uint32_t & arraySize, float16_t** array);
     bool ReadArrayString(const char* key, uint32_t & arraySize, char** array);
 private:
     inline void write(void* buf, size_t bufLen) {

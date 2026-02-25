@@ -496,13 +496,15 @@
 
 #define FPU_SET_P_C2     6
 
-#define FPU_SET_W_FP16   0
+#define FPU_SET_W_BFLOAT 0
 
 #define FPU_SET_W_FP32   16
 
 #define FPU_SET_W_INT16  32
 
 #define FPU_SET_W_ZFP16  48
+
+#define FPU_SET_W_FP16   64
 
 #define FPU_SET_M_VALUE  0
 

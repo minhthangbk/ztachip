@@ -120,6 +120,7 @@ record
     C2_double:std_logic;
     X_type:register2_t;
     Y_type:register2_t;
+    B_type:register2_t;
 end record;
 
 signal fpu_instruction_r:fpu_instruction_t;
@@ -166,7 +167,8 @@ constant fpu_instruction_len_c:integer:=fpu_instruction_r.opcode'length+
                                         1+ --fpu_instruction_r.C_double
                                         1+ --fpu_instruction_r.C2_double
                                         register2_t'length+ --fpu_instruction_r.X_type
-                                        register2_t'length; --fpu_instruction_r.Y_type
+                                        register2_t'length+ --fpu_instruction_r.Y_type
+                                        register2_t'length; --fpu_instruction_r.B_type
 
 subtype fpu_instruction_rec_t is std_logic_vector(fpu_instruction_len_c-1 downto 0);
 
@@ -257,6 +259,8 @@ begin
     len_v := len_v + rec_v.X_type'length;
     rec_v.Y_type := unsigned(q_in(q_in'length-len_v-1 downto q_in'length-len_v-rec_v.Y_type'length));
     len_v := len_v + rec_v.Y_type'length;
+    rec_v.B_type := unsigned(q_in(q_in'length-len_v-1 downto q_in'length-len_v-rec_v.B_type'length));
+    len_v := len_v + rec_v.B_type'length;
     return rec_v;
 end unpack_instruction;
 
@@ -352,6 +356,8 @@ begin
    len_v := len_v + rec_in.X_type'length;
    q_v(q_v'length-len_v-1 downto q_v'length-len_v-rec_in.Y_type'length) := std_logic_vector(rec_in.Y_type);
    len_v := len_v + rec_in.Y_type'length;
+   q_v(q_v'length-len_v-1 downto q_v'length-len_v-rec_in.B_type'length) := std_logic_vector(rec_in.B_type);
+   len_v := len_v + rec_in.B_type'length;
    return q_v;
 end pack_instruction;
 
@@ -421,6 +427,44 @@ begin
    return float_v;
 end function zfp2float;
 
+----
+-- Convert foat16 to float32
+----
+
+subtype fp2float_retval_t is std_logic_vector(31 downto 0);
+function fp2float(f16 : std_logic_vector(15 downto 0)) return fp2float_retval_t is
+variable sign     : std_logic;
+variable exp16    : unsigned(4 downto 0);
+variable mant16   : std_logic_vector(9 downto 0);
+variable exp32    : unsigned(7 downto 0);
+variable mant32   : std_logic_vector(22 downto 0);
+variable result   : std_logic_vector(31 downto 0);
+begin
+    -- Extract components
+    sign   := f16(15);
+    exp16  := unsigned(f16(14 downto 10));
+    mant16 := f16(9 downto 0);
+    -- Conversion Logic
+    if exp16 = 0 then
+        -- Handle Zero and Subnormals (flushed to zero here)
+        exp32  := (others => '0');
+        mant32 := mant16 & "0000000000000";
+        sign := '0';
+    elsif exp16 = 31 then
+        -- Handle Infinity and NaN
+        exp32  := (others => '1');
+        mant32 := mant16 & "0000000000000"; -- NaN
+    else
+        -- Normal numbers: Re-bias the exponent
+        -- Bias correction: 127 - 15 = 112
+        exp32  := resize(exp16,8) + to_unsigned(112,8);
+        mant32 := mant16 & "0000000000000";
+    end if;
+    result := sign & std_logic_vector(exp32) & mant32;
+    return result;
+end function;
+
+------
 
 constant CMD_FIFO_DEPTH:integer:=8;
 
@@ -922,6 +966,8 @@ if(fpu_instruction_r.X_enable='1') then
             end case;
             if(fpu_instruction_r.X_type=register2_fpu_set_W_ZFP16) then
                 exe_x <= zfp2float(x_v);
+            elsif(fpu_instruction_r.X_type=register2_fpu_set_W_FP16) then
+                exe_x <= fp2float(x_v);
             else
                 exe_x <= x_v & "0000000000000000";
             end if;
@@ -964,6 +1010,8 @@ if(fpu_instruction_r.Y_enable='1') then
             end case;
             if(fpu_instruction_r.Y_type=register2_fpu_set_W_ZFP16) then
                 exe_y <= zfp2float(y_v);
+            elsif(fpu_instruction_r.Y_type=register2_fpu_set_W_FP16) then
+                exe_y <= fp2float(y_v);
             else
                 exe_y <= y_v & "0000000000000000";
             end if;
@@ -987,6 +1035,7 @@ end process;
 
 process(fpu_instruction_r,B,step_r)
 variable step_v:unsigned(2 downto 0);
+variable b_v:std_logic_vector(15 downto 0);
 begin
 if(fpu_instruction_r.B_enable='1') then
     if(fpu_instruction_r.B_by_value='0') then
@@ -997,14 +1046,21 @@ if(fpu_instruction_r.B_enable='1') then
                 step_v(1 downto 0) := step_r(1 downto 0)+unsigned(fpu_instruction_r.B_addr(2 downto 1));
                 case step_v(1 downto 0) is
                     when "00" =>
-                        exe_b <= B(15 downto 0) & "0000000000000000";
+                        b_v := B(15 downto 0);
                     when "01" =>
-                        exe_b <= B(31 downto 16) & "0000000000000000";
+                        b_v := B(31 downto 16);
                     when "10" =>
-                        exe_b <= B(47 downto 32) & "0000000000000000";
+                        b_v := B(47 downto 32);
                     when others =>
-                        exe_b <= B(63 downto 48) & "0000000000000000";
+                        b_v := B(63 downto 48);
                 end case;
+                if(fpu_instruction_r.B_type=register2_fpu_set_W_ZFP16) then
+                    exe_b <= zfp2float(b_v);
+                elsif(fpu_instruction_r.B_type=register2_fpu_set_W_FP16) then
+                    exe_b <= fp2float(b_v);
+                else
+                    exe_b <= b_v & "0000000000000000";
+                end if;
             else
                 -- Input is INT16
                 step_v := (others=>'0');
@@ -1419,6 +1475,7 @@ begin
         fpu_instruction_r.C2_double <= '0';
         fpu_instruction_r.X_type <= (others=>'0');
         fpu_instruction_r.Y_type <= (others=>'0');
+        fpu_instruction_r.B_type <= (others=>'0');
 
         fpu_next_instruction_r.opcode <= (others=>'0');  
         fpu_next_instruction_r.A_addr <= (others=>'0');
@@ -1459,6 +1516,7 @@ begin
         fpu_next_instruction_r.C2_double <= '0';
         fpu_next_instruction_r.X_type <= (others=>'0');
         fpu_next_instruction_r.Y_type <= (others=>'0');
+        fpu_next_instruction_r.B_type <= (others=>'0');
 
         B_pending_r <= (others=>'0');
         X_pending_r <= (others=>'0');
@@ -1618,7 +1676,9 @@ begin
                         if(fpu_set_W=register2_fpu_set_W_FP32) then
                             fpu_next_instruction_r.A_precision <= to_unsigned(4,fpu_next_instruction_r.A_precision'length); --FP32
                             fpu_next_instruction_r.A_int <= '0';            
-                        elsif(fpu_set_W=register2_fpu_set_W_FP16 or fpu_set_W=register2_fpu_set_W_ZFP16) then
+                        elsif(fpu_set_W=register2_fpu_set_W_BFLOAT or 
+                              fpu_set_W=register2_fpu_set_W_ZFP16 or
+                              fpu_set_W=register2_fpu_set_W_FP16) then
                             fpu_next_instruction_r.A_precision <= to_unsigned(2,fpu_next_instruction_r.A_precision'length); --FP16
                             fpu_next_instruction_r.A_int <= '0';  
                         elsif(fpu_set_W=register2_fpu_set_W_INT16) then
@@ -1631,10 +1691,12 @@ begin
                     elsif(fpu_set_P=register2_fpu_set_P_B) then
                         if(fpu_set_M=register2_fpu_set_M_VALUE) then
                             fpu_next_instruction_r.B_addr <= (others=>'0');
-                            if(fpu_set_W=register2_fpu_set_W_FP16 ) then
-                                fpu_next_instruction_r.B <= bus_writedata_in(fp16_t'length-1 downto 0) & "0000000000000000";
+                            if(fpu_set_W=register2_fpu_set_W_BFLOAT ) then
+                                fpu_next_instruction_r.B <= bus_writedata_in(bfloat_t'length-1 downto 0) & "0000000000000000";
                             elsif(fpu_set_W=register2_fpu_set_W_ZFP16 ) then
                                 fpu_next_instruction_r.B <= bus_writedata_in(fp12_t'length-1 downto 0) & "0000000000000000";
+                            elsif(fpu_set_W=register2_fpu_set_W_FP16 ) then
+                                fpu_next_instruction_r.B <= bus_writedata_in(fp16_t'length-1 downto 0) & "0000000000000000";
                             else
                                 fpu_next_instruction_r.B <= bus_writedata_in;
                             end if;
@@ -1647,21 +1709,26 @@ begin
                         if(fpu_set_W=register2_fpu_set_W_INT16) then
                             fpu_next_instruction_r.B_precision <= to_unsigned(2,fpu_next_instruction_r.B_precision'length);                    
                             fpu_next_instruction_r.B_int <= '1';
-                        elsif(fpu_set_W=register2_fpu_set_W_FP16 or fpu_set_W=register2_fpu_set_W_ZFP16) then
+                        elsif(fpu_set_W=register2_fpu_set_W_BFLOAT or 
+                              fpu_set_W=register2_fpu_set_W_ZFP16 or
+                              fpu_set_W=register2_fpu_set_W_FP16) then
                             fpu_next_instruction_r.B_precision <= to_unsigned(2,fpu_next_instruction_r.B_precision'length);
                             fpu_next_instruction_r.B_int <= '0';
                         else
                             fpu_next_instruction_r.B_precision <= to_unsigned(4,fpu_next_instruction_r.B_precision'length);
                             fpu_next_instruction_r.B_int <= '0';
                         end if;
+                        fpu_next_instruction_r.B_type <= fpu_set_W;
                         fpu_next_instruction_r.B_enable <= '1';
                     elsif(fpu_set_P=register2_fpu_set_P_C) then
                         if(fpu_set_M=register2_fpu_set_M_VALUE) then
                             fpu_next_instruction_r.C_addr <= (others=>'0');
-                            if(fpu_set_W=register2_fpu_set_W_FP16) then
-                                fpu_next_instruction_r.C <= bus_writedata_in(fp16_t'length-1 downto 0) & "0000000000000000";
+                            if(fpu_set_W=register2_fpu_set_W_BFLOAT) then
+                                fpu_next_instruction_r.C <= bus_writedata_in(bfloat_t'length-1 downto 0) & "0000000000000000";
                             elsif(fpu_set_W=register2_fpu_set_W_ZFP16) then
                                 fpu_next_instruction_r.C <= bus_writedata_in(fp12_t'length-1 downto 0) & "0000000000000000";
+                            elsif(fpu_set_W=register2_fpu_set_W_FP16) then
+                                fpu_next_instruction_r.C <= bus_writedata_in(fp16_t'length-1 downto 0) & "0000000000000000";
                             else
                                 fpu_next_instruction_r.C <= bus_writedata_in(fp32_t'length-1 downto 0);
                             end if;
@@ -1675,18 +1742,22 @@ begin
                             fpu_next_instruction_r.C_pending <= '0';
                             fpu_next_instruction_r.C_enable <= '1';
                         end if;
-                        if(fpu_set_W=register2_fpu_set_W_FP16 or fpu_set_W=register2_fpu_set_W_ZFP16) then
-                            fpu_next_instruction_r.C_double <= '0';
+                        if(fpu_set_W=register2_fpu_set_W_BFLOAT or 
+                           fpu_set_W=register2_fpu_set_W_ZFP16 or
+                           fpu_set_W=register2_fpu_set_W_FP16) then
+                           fpu_next_instruction_r.C_double <= '0';
                         else
                             fpu_next_instruction_r.C_double <= '1';
                         end if;
                     elsif(fpu_set_P=register2_fpu_set_P_C2) then
                         if(fpu_set_M=register2_fpu_set_M_VALUE) then
                             fpu_next_instruction_r.C2_addr <= (others=>'0');
-                            if(fpu_set_W=register2_fpu_set_W_FP16) then
-                                fpu_next_instruction_r.C2 <= bus_writedata_in(fp16_t'length-1 downto 0) & "0000000000000000";
+                            if(fpu_set_W=register2_fpu_set_W_BFLOAT) then
+                                fpu_next_instruction_r.C2 <= bus_writedata_in(bfloat_t'length-1 downto 0) & "0000000000000000";
                             elsif(fpu_set_W=register2_fpu_set_W_ZFP16) then
                                 fpu_next_instruction_r.C2 <= bus_writedata_in(fp12_t'length-1 downto 0) & "0000000000000000";
+                            elsif(fpu_set_W=register2_fpu_set_W_FP16) then
+                                fpu_next_instruction_r.C2 <= bus_writedata_in(fp16_t'length-1 downto 0) & "0000000000000000";
                             else
                                 fpu_next_instruction_r.C2 <= bus_writedata_in(fp32_t'length-1 downto 0);
                             end if;
@@ -1700,7 +1771,9 @@ begin
                             fpu_next_instruction_r.C2_pending <= '0';
                             fpu_next_instruction_r.C2_enable <= '1';
                         end if;
-                        if(fpu_set_W=register2_fpu_set_W_FP16 or fpu_set_W=register2_fpu_set_W_ZFP16) then
+                        if(fpu_set_W=register2_fpu_set_W_BFLOAT or 
+                           fpu_set_W=register2_fpu_set_W_ZFP16 or
+                           fpu_set_W=register2_fpu_set_W_FP16) then
                             fpu_next_instruction_r.C2_double <= '0';
                         else
                             fpu_next_instruction_r.C2_double <= '1';
@@ -1708,10 +1781,12 @@ begin
                     elsif(fpu_set_P=register2_fpu_set_P_X) then
                         if(fpu_set_M = register2_fpu_set_M_VALUE) then
                             fpu_next_instruction_r.X_addr <= (others=>'0');
-                            if(fpu_set_W=register2_fpu_set_W_FP16) then
-                                fpu_next_instruction_r.X <= bus_writedata_in(fp16_t'length-1 downto 0) & "0000000000000000";
+                            if(fpu_set_W=register2_fpu_set_W_BFLOAT) then
+                                fpu_next_instruction_r.X <= bus_writedata_in(bfloat_t'length-1 downto 0) & "0000000000000000";
                             elsif(fpu_set_W=register2_fpu_set_W_ZFP16) then
                                 fpu_next_instruction_r.X <= bus_writedata_in(fp12_t'length-1 downto 0) & "0000000000000000";
+                            elsif(fpu_set_W=register2_fpu_set_W_FP16) then
+                                fpu_next_instruction_r.X <= bus_writedata_in(fp16_t'length-1 downto 0) & "0000000000000000";
                             else
                                 fpu_next_instruction_r.X <= bus_writedata_in(fp32_t'length-1 downto 0);
                             end if;
@@ -1723,7 +1798,9 @@ begin
                             fpu_next_instruction_r.X_enable <= '1';
                             fpu_next_instruction_r.X_by_value <= '0';
                         end if;
-                        if(fpu_set_W = register2_fpu_set_W_FP16 or fpu_set_W = register2_fpu_set_W_ZFP16) then
+                        if(fpu_set_W = register2_fpu_set_W_BFLOAT or 
+                           fpu_set_W = register2_fpu_set_W_ZFP16 or
+                           fpu_set_W = register2_fpu_set_W_FP16 ) then
                             fpu_next_instruction_r.X_double <= '0';
                         else
                             fpu_next_instruction_r.X_double <= '1';
@@ -1732,10 +1809,12 @@ begin
                     elsif(fpu_set_P=register2_fpu_set_P_Y) then
                         if(fpu_set_M = register2_fpu_set_M_VALUE) then
                             fpu_next_instruction_r.Y_addr <= (others=>'0');
-                            if(fpu_set_W=register2_fpu_set_W_FP16) then
-                                fpu_next_instruction_r.Y <= bus_writedata_in(fp16_t'length-1 downto 0) & "0000000000000000";
+                            if(fpu_set_W=register2_fpu_set_W_BFLOAT) then
+                                fpu_next_instruction_r.Y <= bus_writedata_in(bfloat_t'length-1 downto 0) & "0000000000000000";
                             elsif(fpu_set_W=register2_fpu_set_W_ZFP16) then
                                 fpu_next_instruction_r.Y <= bus_writedata_in(fp12_t'length-1 downto 0) & "0000000000000000";
+                            elsif(fpu_set_W=register2_fpu_set_W_FP16) then
+                                fpu_next_instruction_r.Y <= bus_writedata_in(fp16_t'length-1 downto 0) & "0000000000000000";
                             else
                                 fpu_next_instruction_r.Y <= bus_writedata_in(fp32_t'length-1 downto 0);
                             end if;
@@ -1748,7 +1827,9 @@ begin
                             fpu_next_instruction_r.Y_by_value <= '0';
                         end if;
                         fpu_next_instruction_r.Y_type <= fpu_set_W;
-                        if(fpu_set_W = register2_fpu_set_W_FP16 or fpu_set_W = register2_fpu_set_W_ZFP16) then
+                        if(fpu_set_W = register2_fpu_set_W_BFLOAT or 
+                          fpu_set_W = register2_fpu_set_W_ZFP16 or
+                          fpu_set_W = register2_fpu_set_W_FP16) then
                             fpu_next_instruction_r.Y_double <= '0';
                         else
                             fpu_next_instruction_r.Y_double <= '1';

@@ -56,17 +56,15 @@ extern void kernel_llm_SwiGLU_exe(int reqId,float16_t *hb,float16_t *hb2,int N);
 
 extern void kernel_llm_softmax_exe(int reqId,float16_t *x,int N);
 
-extern void kernel_llm_rms_exe(int reqId,int N,float16_t *x,float16_t *o,float *w);
+extern void kernel_llm_rms_exe(int reqId,int N,float16_t *x,bool x_is_fp16,float16_t *o,float *w);
 
 extern void kernel_llm_rope_exe(int reqId,int N,float *fcr,float *fci,float16_t *v,float16_t *y);
 
-extern void kernel_llm_residual_exe(int reqId,int N,float16_t *x,float16_t *y,float16_t *xb);
-
-extern void kernel_llm_scale_exe(int reqId,int N,float16_t *x,float scale);
+extern void kernel_llm_residual_exe(int reqId,int N,float16_t *x,bool x_is_fp16,float16_t *y,float16_t *xb);
 
 extern int kernel_llm_find_max(float16_t *x,uint32_t N);
 
-extern int kernel_llm_find_k_max(float16_t *x,uint32_t N,int K,int *top,float16_t *topp);
+extern int kernel_llm_find_k_max(float16_t *x,uint32_t N,int K,float scale,int *top,float16_t *topp);
 
 extern void kernel_llm_done();
 

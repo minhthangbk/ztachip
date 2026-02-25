@@ -227,7 +227,7 @@ static void matmul_q4(void *_p,int pid) {
             ii < cnt2;
             ii++,s2++,s1 += cnt,s3 += cnt) {
                
-               y_type = ((ii==(cnt2-1) && (x+NUM_PCORE)>=N)?FPU_SET_W_FP16:FPU_SET_W_FP32)|FPU_SET_M_ADDR;
+               y_type = ((ii==(cnt2-1) && (x+NUM_PCORE)>=N)?FPU_SET_W_BFLOAT:FPU_SET_W_FP32)|FPU_SET_M_ADDR;
                a_type = (((x==0) && (ii==0))?FPU_SET_M_VALUE:FPU_SET_M_ADDR)|FPU_SET_W_FP32;
                a = (uint32_t)(((x==0) && (ii==0))?0:ws->s4);
 
@@ -240,7 +240,7 @@ static void matmul_q4(void *_p,int pid) {
 
                _end_ = (ii==(cnt2-1))?0:(fast?':':'.');
 
-               >FPU.MAC(N=cnt,y=(y_type)ws->s4,A=(a_type)a,c=(bfloat *)s2,x1=(bfloat *)s1,x2=(zfloat *)s3) _end_;
+               >FPU.MAC(N=cnt,y=(y_type)ws->s4,A=(a_type)a,c=(bfloat *)s2,x1=(float16 *)s1,x2=(zfloat *)s3) _end_;
          }
          ztaTaskYield();
       }
@@ -352,7 +352,7 @@ static void matmul_q8(void *_p,int pid) {
             ii < cnt2;
             ii++,s2++,s1 += cnt,s3 += cnt) {
 
-               y_type = ((ii==(cnt2-1) && (x+NUM_PCORE)>=N)?FPU_SET_W_FP16:FPU_SET_W_FP32)|FPU_SET_M_ADDR;
+               y_type = ((ii==(cnt2-1) && (x+NUM_PCORE)>=N)?FPU_SET_W_BFLOAT:FPU_SET_W_FP32)|FPU_SET_M_ADDR;
 
                a_type = (((x==0) && (ii==0))?FPU_SET_M_VALUE:FPU_SET_M_ADDR)|FPU_SET_W_FP32;
 
@@ -367,7 +367,7 @@ static void matmul_q8(void *_p,int pid) {
 
                _end_ = (ii==(cnt2-1))?0:(fast?':':'.');
 
-               >FPU.MAC(N=cnt,y=(y_type)ws->s4,A=(a_type)a,c=(bfloat *)s2,x1=(bfloat *)s1,x2=(zfloat *)s3) _end_;
+               >FPU.MAC(N=cnt,y=(y_type)ws->s4,A=(a_type)a,c=(bfloat *)s2,x1=(float16 *)s1,x2=(zfloat *)s3) _end_;
          }
          ztaTaskYield();
       }
@@ -514,7 +514,7 @@ void kernel_llm_quantize_exe(int reqId,int N,float16_t *x,float16_t *s,int16_t *
 
       >DTYPE(INT16)MEM(y16,N/32)[j:j+remain2-1] <= DTYPE(INT16)SCRATCH((uint32_t)ws->y16,remain2)[:];
 
-      reciprocal(remain2,ws->y16,FPU_SET_W_FP16|FPU_SET_M_ADDR,ws->y,ws->temp);
+      reciprocal(remain2,ws->y16,FPU_SET_W_BFLOAT|FPU_SET_M_ADDR,ws->y,ws->temp);
 
       x1 = (unsigned int)(&((uint16_t *)x)[j * GS]);
       y = (unsigned int)(&q[0]);
@@ -637,7 +637,7 @@ static void llm_dot_product_exe(void *_p,int pid)
          {
             y = last?(uint32_t)(&ws->sum2[k]):sum; 
 
-            yfmt = ((last)?FPU_SET_W_FP16:FPU_SET_W_FP32)|FPU_SET_M_ADDR; 
+            yfmt = ((last)?FPU_SET_W_BFLOAT:FPU_SET_W_FP32)|FPU_SET_M_ADDR; 
             
             A=(i==0)?0:sum;
             
@@ -775,7 +775,7 @@ static void llm_dot_product2_exe(void *_p,int pid)
          {
             y = last?(uint32_t)(&ws->sram_sum2[i]):sum;
 
-            yfmt = ((last)?FPU_SET_W_FP16:FPU_SET_W_FP32)|FPU_SET_M_ADDR; 
+            yfmt = ((last)?FPU_SET_W_BFLOAT:FPU_SET_W_FP32)|FPU_SET_M_ADDR; 
 
             A=(j==0)?0:sum;
 
@@ -1197,7 +1197,7 @@ typedef struct
    float    tmp2;
 } rms_ws;
 
-void kernel_llm_rms_exe(int reqId,int N,float16_t *x,float16_t *o,float *w)
+void kernel_llm_rms_exe(int reqId,int N,float16_t *x,bool x_is_fp16,float16_t *o,float *w)
 {
    int i;
    int cnt;
@@ -1209,12 +1209,14 @@ void kernel_llm_rms_exe(int reqId,int N,float16_t *x,float16_t *o,float *w)
    static int _N=0;
    float N_reciprocal;
    int diff;
+   uint32_t xfmt;
 
    if(_N != N) {
       // Save for next time
       _N_reciprocal = 1/(float)N;
       _N = N;
    }
+   xfmt = ((x_is_fp16)?FPU_SET_W_FP16:FPU_SET_W_BFLOAT)|FPU_SET_M_ADDR;
    N_reciprocal = _N_reciprocal;
    for(i=0;i < N;i += RMS_BATCH) {
       cnt = N-i;
@@ -1225,9 +1227,9 @@ void kernel_llm_rms_exe(int reqId,int N,float16_t *x,float16_t *o,float *w)
       > DTYPE(INT16)SCRATCH((uint32_t)&ws->x[0],cnt)[:] <= DTYPE(INT16)MEM((uint32_t)x,N)[i:i+cnt-1];
 
       if(i==0) {
-         >FPU.FMA(N=cnt,y=(float *)&ws->sum,x1=(bfloat *)ws->x,x2=(bfloat *)ws->x,A=0.0);
+         >FPU.FMA(N=cnt,y=(float *)&ws->sum,x1=(xfmt)ws->x,x2=(xfmt)ws->x,A=0.0);
       } else {
-         >FPU.FMA(N=cnt,y=(float *)&ws->sum,x1=(bfloat *)ws->x,x2=(bfloat *)ws->x,A=(float *)&ws->sum);
+         >FPU.FMA(N=cnt,y=(float *)&ws->sum,x1=(xfmt)ws->x,x2=(xfmt)ws->x,A=(float *)&ws->sum);
       }
    }
 
@@ -1248,7 +1250,7 @@ void kernel_llm_rms_exe(int reqId,int N,float16_t *x,float16_t *o,float *w)
 
       // o[j] = weight[j] * (ss * x[j]);
 
-      >FPU.MAC(N=cnt,y=(bfloat *)ws->o,c=(float *)&ws->ss2,x1=(bfloat *)ws->x,x2=(float *)ws->w);
+      >FPU.MAC(N=cnt,y=(bfloat *)ws->o,c=(float *)&ws->ss2,x1=(xfmt)ws->x,x2=(float *)ws->w);
 
       >DTYPE(INT16)MEM((uint32_t)o,N)[i:i+cnt-1] <= DTYPE(INT16)SCRATCH(((uint32_t)&ws->o[0]),cnt)[0:cnt-1];   
 
@@ -1360,6 +1362,7 @@ void kernel_llm_residual_exe(
    int reqId,
    int N,
    float16_t *x,
+   bool x_is_fp16,
    float16_t *y,
    float16_t *xb
    )
@@ -1367,6 +1370,9 @@ void kernel_llm_residual_exe(
    int i,cnt;
    uint32_t resp;
    residual_ws *ws=0;
+   uint32_t xfmt;
+
+   xfmt = ((x_is_fp16)?FPU_SET_W_FP16:FPU_SET_W_BFLOAT)|FPU_SET_M_ADDR;
 
    for(i=0;i < N;i += RESIDUAL_BATCH)
    {
@@ -1378,52 +1384,9 @@ void kernel_llm_residual_exe(
 
       > DTYPE(INT16)SCRATCH((uint32_t)&ws->xb[0],cnt)[:] <= DTYPE(INT16)MEM((uint32_t)xb,N)[i:i+cnt-1];
 
-      >FPU.MAC(N=cnt,y=(bfloat *)ws->x,A=(bfloat *)ws->x,x1=(bfloat *)ws->xb);
+      >FPU.MAC(N=cnt,y=(bfloat *)ws->x,A=(xfmt)ws->x,x1=(bfloat *)ws->xb);
 
       >DTYPE(INT16)MEM((uint32_t)y,N)[i:i+cnt-1] <= DTYPE(INT16)SCRATCH(((uint32_t)&ws->x[0]),cnt)[0:cnt-1];   
-
-      > BARRIER; 
-   }
-   ztaJobDone(reqId);
-}
-
-//--------------------------------------------------------------------------
-// Kernel to accelerate scaling functions
-// y = scale * x
-// Reference C/C++ implementation
-//     llm_ref.c:kernel_ref_llm_scale_exe
-//--------------------------------------------------------------------------
-
-// Work space defintion for this kernel
-
-#define SCALE_BATCH 1024
-
-typedef struct  {
-   float    x[SCALE_BATCH];
-} scale_ws;
-
-void kernel_llm_scale_exe(
-   int reqId,
-   int N,
-   float16_t *x,
-   float scale
-   )
-{
-   int i,cnt;
-   uint32_t resp;
-   scale_ws *ws=0;
-
-   for(i=0;i < N;i += SCALE_BATCH)
-   {
-      cnt = N-i;
-      if(cnt > SCALE_BATCH)
-         cnt = SCALE_BATCH;
-
-      > DTYPE(INT16)SCRATCH((uint32_t)&ws->x[0],cnt)[:] <= DTYPE(INT16)MEM((uint32_t)x,N)[i:i+cnt-1];
-
-      >FPU.MAC(N=cnt,y=(bfloat *)ws->x,c=(float)scale,x1=(bfloat *)ws->x);
-
-      >DTYPE(INT16)MEM((uint32_t)x,N)[i:i+cnt-1] <= DTYPE(INT16)SCRATCH(((uint32_t)&ws->x[0]),cnt)[0:cnt-1];   
 
       > BARRIER; 
    }
@@ -1481,7 +1444,7 @@ typedef struct  {
 // Find the top-k tokens of highest probability
 //--------------------------------------------------------------------------
 
-int kernel_llm_find_k_max(float16_t *x,uint32_t _N,int K, int *top,float16_t *topp) {
+int kernel_llm_find_k_max(float16_t *x,uint32_t _N,int K, float scale,int *top,float16_t *topp) {
    uint32_t cnt,cnt2;
    int N;
    int toggle=0;
@@ -1514,6 +1477,8 @@ int kernel_llm_find_k_max(float16_t *x,uint32_t _N,int K, int *top,float16_t *to
 
    >DTYPE(INT16)SCRATCH((uint32_t)&ws->x[toggle][0],MAX_K_BATCH)[:] <= DTYPE(INT16)MEM((uint32_t)x,_N)[0:MAX_K_BATCH-1];
 
+   >FPU.MAC(N=MAX_K_BATCH,y=(bfloat *)ws->x[toggle],c=(float)scale,x1=(bfloat *)ws->x[toggle]);
+
    >FPU.MAX(N=MAX_K_BATCH,y=(bfloat *)ws->y[toggle],x=(bfloat *)ws->x[toggle],g=63);
 
    for (int i = 0; i < N; i+=MAX_K_BATCH) {
@@ -1532,6 +1497,8 @@ int kernel_llm_find_k_max(float16_t *x,uint32_t _N,int K, int *top,float16_t *to
          cnt2 = MAX(cnt2,MAX_K_GROUP_SZ);
 
          >DTYPE(INT16)SCRATCH((uint32_t)&ws->x[!toggle][0],cnt2)[:] <= DTYPE(INT16)MEM((uint32_t)x,_N)[i+MAX_K_BATCH:i+MAX_K_BATCH+cnt2-1];
+
+         >FPU.MAC(N=cnt2,y=(bfloat *)ws->x[!toggle],c=(float)scale,x1=(bfloat *)ws->x[!toggle]);
 
          >FPU.MAX(N=cnt2,y=(bfloat *)ws->y[!toggle],x=(bfloat *)ws->x[!toggle],g=63);
       }

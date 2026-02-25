@@ -66,6 +66,52 @@ inline float16_t F2BF(float x) {
     return ((uint16_t *)&x)[1];
 }
 
+inline float16_t F2FP16(float x) {
+    union { float f; uint32_t u; } v;
+    uint32_t f_bits;
+    uint32_t sign;
+    int32_t exp;
+    uint32_t mant;
+    bool round;
+
+    v.f = x;
+    f_bits = v.u;
+    sign = (f_bits >> 16) & 0x8000;
+    exp = ((f_bits >> 23) & 0xFF) - 127;
+    mant = f_bits & 0x7FFFFF;
+    exp += 15;
+    mant >>= 12;
+    round = (mant&1)?true:false;
+    mant >>= 1;
+    if(round && mant != 0x3ff)
+        mant++;
+    if (exp <= 0)
+        return 0;
+    if (exp >= 31)
+        return (sign | 0x7C00);
+    return sign | (exp << 10) | mant;
+}
+
+inline float FP16_2_F(float16_t x) {
+    union { uint32_t u; float f; } v;
+    uint32_t sign = (x & 0x8000) << 16;
+    uint32_t exp  = (x & 0x7C00) >> 10;
+    uint32_t mant = (x & 0x03FF);
+
+    if(exp == 0) {
+        // zero/subnormal treat as zero
+        v.u = sign;
+    } else if(exp == 0x1F) {
+        // Inf/NaN
+        v.u = sign | 0x7F800000 | (mant << 13);
+    } else {
+        // normalized
+        exp = exp + (127 - 15);
+        v.u = sign | (exp << 23) | (mant << 13);
+    }
+    return v.f;
+}
+
 inline int BFCMP(float16_t a,float16_t b) {
     // Transform sign-magnitude bits to linear signed integers
     // If sign bit is set, value = -(magnitude). Else, value = magnitude.
